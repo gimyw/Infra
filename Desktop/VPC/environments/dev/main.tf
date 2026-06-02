@@ -83,3 +83,10 @@ module "cloudwatch" {
   ecs_service_name = "dev-app-service"
   rds_instance_id  = "dev-rds"
 }
+
+module "s3" {
+  source = "../../modules/s3"
+
+  env         = "dev"
+  bucket_name = "farmily-dev-s3-bucket"
+}

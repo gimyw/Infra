@@ -128,6 +128,19 @@ resource "aws_route_table_association" "private_c" {
   route_table_id = aws_route_table.private_c.id
 }
 
+# S3 VPC Gateway Endpoint
+resource "aws_vpc_endpoint" "s3" {
+  vpc_id       = aws_vpc.main.id
+  service_name = "com.amazonaws.${var.region}.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = compact([
+    aws_route_table.private_a.id,
+    aws_route_table.private_c.id,
+  ])
+
+  tags = { Name = "${var.env}-s3-endpoint" }
+}
+
 # VPN Client (Dev only)
 resource "aws_ec2_client_vpn_endpoint" "main" {
   count                  = var.enable_vpn ? 1 : 0
