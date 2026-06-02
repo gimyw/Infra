@@ -27,6 +27,13 @@ module "vpc" {
   enable_vpn            = false
 }
 
+module "sg" {
+  source = "../../modules/sg"
+
+  env    = "prod"
+  vpc_id = module.vpc.vpc_id
+}
+
 module "ecs" {
   source = "../../modules/ecs"
 
@@ -39,8 +46,14 @@ module "ecs" {
   desired_count          = 4
   task_cpu               = "512"
   task_memory            = "1024"
-  ecs_security_group_ids = var.ecs_security_group_ids
-  alb_security_group_ids = var.alb_security_group_ids
+  ecs_security_group_ids = [module.sg.ecs_sg_id]
+  alb_security_group_ids = [module.sg.alb_sg_id]
+  spring_profile         = "prod"
+  db_address             = module.rds.address
+  db_name                = var.db_name
+  db_username            = var.db_username
+  db_password            = var.db_password
+  redis_endpoint         = module.elasticache.primary_endpoint
 }
 
 module "rds" {
@@ -48,7 +61,7 @@ module "rds" {
 
   env                = "prod"
   private_subnet_ids = [module.vpc.private_subnet_a_id, module.vpc.private_subnet_c_id]
-  security_group_ids = var.rds_security_group_ids
+  security_group_ids = [module.sg.rds_sg_id]
   instance_class     = "db.t3.small"
   allocated_storage  = 50
   db_name            = var.db_name
@@ -62,7 +75,7 @@ module "elasticache" {
 
   env                = "prod"
   private_subnet_ids = [module.vpc.private_subnet_a_id, module.vpc.private_subnet_c_id]
-  security_group_ids = var.redis_security_group_ids
+  security_group_ids = [module.sg.redis_sg_id]
   node_type          = "cache.t3.small"
   num_cache_clusters = 2
 }

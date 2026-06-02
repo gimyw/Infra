@@ -5,3 +5,4 @@
 .terraform.lock.hcl
 *.tfvars
 !*.tfvars.example
+.DS_Store

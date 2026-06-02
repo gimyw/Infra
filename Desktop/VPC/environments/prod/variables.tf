@@ -23,19 +23,3 @@ variable "db_password" {
 variable "s3_bucket_name" {
   type = string
 }
-
-variable "ecs_security_group_ids" {
-  type = list(string)
-}
-
-variable "alb_security_group_ids" {
-  type = list(string)
-}
-
-variable "rds_security_group_ids" {
-  type = list(string)
-}
-
-variable "redis_security_group_ids" {
-  type = list(string)
-}

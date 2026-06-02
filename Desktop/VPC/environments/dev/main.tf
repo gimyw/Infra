@@ -24,9 +24,14 @@ module "vpc" {
   private_subnet_a_cidr = "10.0.10.0/24"
   private_subnet_c_cidr = "10.0.11.0/24"
   enable_multi_nat      = false
-  enable_vpn            = true
-  vpn_server_cert_arn   = var.vpn_server_cert_arn
-  vpn_client_cert_arn   = var.vpn_client_cert_arn
+  enable_vpn            = false
+}
+
+module "sg" {
+  source = "../../modules/sg"
+
+  env    = "dev"
+  vpc_id = module.vpc.vpc_id
 }
 
 module "ecs" {
@@ -39,8 +44,14 @@ module "ecs" {
   private_subnet_ids     = [module.vpc.private_subnet_a_id, module.vpc.private_subnet_c_id]
   container_image        = var.container_image
   desired_count          = 1
-  ecs_security_group_ids = var.ecs_security_group_ids
-  alb_security_group_ids = var.alb_security_group_ids
+  ecs_security_group_ids = [module.sg.ecs_sg_id]
+  alb_security_group_ids = [module.sg.alb_sg_id]
+  spring_profile         = "dev"
+  db_address             = module.rds.address
+  db_name                = var.db_name
+  db_username            = var.db_username
+  db_password            = var.db_password
+  redis_endpoint         = module.elasticache.primary_endpoint
 }
 
 module "rds" {
@@ -48,7 +59,7 @@ module "rds" {
 
   env                = "dev"
   private_subnet_ids = [module.vpc.private_subnet_a_id, module.vpc.private_subnet_c_id]
-  security_group_ids = var.rds_security_group_ids
+  security_group_ids = [module.sg.rds_sg_id]
   db_name            = var.db_name
   db_username        = var.db_username
   db_password        = var.db_password
@@ -60,7 +71,7 @@ module "elasticache" {
 
   env                = "dev"
   private_subnet_ids = [module.vpc.private_subnet_a_id, module.vpc.private_subnet_c_id]
-  security_group_ids = var.redis_security_group_ids
+  security_group_ids = [module.sg.redis_sg_id]
   num_cache_clusters = 1
 }
 
