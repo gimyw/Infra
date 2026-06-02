@@ -49,11 +49,11 @@ variable "health_check_path" {
 }
 
 variable "ecs_security_group_ids" {
-  type = string
+  type = list(string)
 }
 
 variable "alb_security_group_ids" {
-  type = string
+  type = list(string)
 }
 
 variable "alb_certificate_arn" {
@@ -86,8 +86,8 @@ variable "db_username" {
 }
 
 variable "db_password" {
-  type = string
-  default = ""
+  type      = string
+  sensitive = true
 }
 
 variable "redis_endpoint" {
