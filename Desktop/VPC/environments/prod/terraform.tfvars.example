@@ -1,0 +1,11 @@
+region          = "ap-northeast-2"
+container_image = "your-ecr-repo/app:latest"
+db_name         = "appdb"
+db_username     = "admin"
+db_password     = "changeme"
+s3_bucket_name  = "prod-app-static-assets"
+
+ecs_security_group_ids   = []
+alb_security_group_ids   = []
+rds_security_group_ids   = []
+redis_security_group_ids = []
