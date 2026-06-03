@@ -7,7 +7,7 @@ resource "aws_db_subnet_group" "main" {
 
 resource "aws_db_instance" "main" {
   identifier              = "${var.env}-rds"
-  engine                  = "mysql"
+  engine                  = "postgres"
   engine_version          = var.engine_version
   instance_class          = var.instance_class
   allocated_storage       = var.allocated_storage

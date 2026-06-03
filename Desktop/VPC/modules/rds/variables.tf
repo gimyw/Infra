@@ -12,7 +12,7 @@ variable "security_group_ids" {
 
 variable "engine_version" {
   type    = string
-  default = "8.0"
+  default = "16.4"
 }
 
 variable "instance_class" {
