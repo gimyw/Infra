@@ -17,9 +17,13 @@ locals {
   app_environment = concat(
     var.extra_environment,
     [
-      { name = "S3_BUCKET",    value = module.s3.bucket_id },
-      { name = "S3_REGION",    value = var.region },
-      { name = "CDN_BASE_URL", value = "https://${module.cloudfront.distribution_domain_name}" },
+      { name = "S3_BUCKET",              value = module.s3.bucket_id },
+      { name = "S3_REGION",              value = var.region },
+      { name = "CDN_BASE_URL",           value = "https://${module.cloudfront.distribution_domain_name}" },
+      { name = "AI_PROVIDER",            value = var.ai_provider },
+      { name = "AWS_REGION",             value = var.bedrock_region },
+      { name = "BEDROCK_AGENT_ID",       value = var.bedrock_agent_id },
+      { name = "BEDROCK_AGENT_ALIAS_ID", value = var.bedrock_agent_alias_id },
     ]
   )
 }
@@ -67,6 +71,7 @@ module "ecs" {
   redis_endpoint         = module.elasticache.primary_endpoint
   extra_environment      = local.app_environment
   s3_bucket_arn          = module.s3.bucket_arn
+  enable_bedrock         = var.ai_provider == "bedrock"
 }
 
 module "rds" {

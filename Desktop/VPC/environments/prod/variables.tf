@@ -31,4 +31,27 @@ variable "extra_environment" {
   sensitive = true
 }
 
+variable "ai_provider" {
+  type        = string
+  default     = "mock"
+  description = "AI 백엔드 선택 (mock | bedrock). bedrock으로 바꾸면 Task Role에 Bedrock 권한 자동 부여."
+}
+
+variable "bedrock_region" {
+  type    = string
+  default = "us-west-2"
+}
+
+variable "bedrock_agent_id" {
+  type        = string
+  default     = ""
+  description = "Bedrock Agent ID (콘솔에서 생성 후 tfvars로 주입)."
+}
+
+variable "bedrock_agent_alias_id" {
+  type        = string
+  default     = ""
+  description = "Bedrock Agent Alias ID."
+}
+
 

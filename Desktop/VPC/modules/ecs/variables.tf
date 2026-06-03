@@ -105,3 +105,15 @@ variable "s3_bucket_arn" {
   type        = string
   description = "ECS Task가 접근할 S3 버킷 ARN (앱 파일 업로드용)"
 }
+
+variable "enable_bedrock" {
+  type        = bool
+  default     = false
+  description = "Bedrock AI 기능 활성화 여부. true일 때만 Task Role에 Bedrock 정책 부여."
+}
+
+variable "bedrock_agent_resource_arns" {
+  type        = list(string)
+  default     = ["*"]
+  description = "Bedrock InvokeAgent 허용 리소스 ARN 목록. 콘솔에서 Agent 만든 후 특정 ARN으로 좁히는 것 권장."
+}

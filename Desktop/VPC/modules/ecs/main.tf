@@ -181,6 +181,25 @@ resource "aws_iam_role_policy" "ecs_task_s3" {
   })
 }
 
+resource "aws_iam_role_policy" "ecs_task_bedrock" {
+  count = var.enable_bedrock ? 1 : 0
+  name  = "${var.env}-ecs-task-bedrock-policy"
+  role  = aws_iam_role.ecs_task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "bedrock:InvokeAgent",
+        "bedrock:Retrieve",
+        "bedrock:RetrieveAndGenerate",
+      ]
+      Resource = var.bedrock_agent_resource_arns
+    }]
+  })
+}
+
 resource "aws_cloudwatch_log_group" "ecs" {
   name              = "/ecs/${var.env}-app"
   retention_in_days = 30
