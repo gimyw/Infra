@@ -104,7 +104,8 @@ module "cloudwatch" {
 }
 
 resource "aws_s3_bucket_policy" "frontend_oac"{
-  bucket = module.s3.bukcet_id
+  #bucket_id 오타 수정
+  bucket = module.s3.bucket_id
 
   policy = jsonencode({
       Version = "2012-10-17"
