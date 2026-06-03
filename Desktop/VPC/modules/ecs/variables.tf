@@ -100,3 +100,8 @@ variable "extra_environment" {
   default = []
   description = "JWT_SECRET , KAKAO_*, PORTONE_* 등 추가 env 평문 주입"
 }
+
+variable "s3_bucket_arn" {
+  type        = string
+  description = "ECS Task가 접근할 S3 버킷 ARN (앱 파일 업로드용)"
+}

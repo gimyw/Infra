@@ -13,6 +13,17 @@ provider "aws" {
   region = var.region
 }
 
+locals {
+  app_environment = concat(
+    var.extra_environment,
+    [
+      { name = "S3_BUCKET",    value = module.s3.bucket_id },
+      { name = "S3_REGION",    value = var.region },
+      { name = "CDN_BASE_URL", value = "https://${module.cloudfront.distribution_domain_name}" },
+    ]
+  )
+}
+
 module "vpc" {
   source = "../../modules/vpc"
 
@@ -54,6 +65,8 @@ module "ecs" {
   db_username            = var.db_username
   db_password            = var.db_password
   redis_endpoint         = module.elasticache.primary_endpoint
+  extra_environment      = local.app_environment
+  s3_bucket_arn          = module.s3.bucket_arn
 }
 
 module "rds" {
