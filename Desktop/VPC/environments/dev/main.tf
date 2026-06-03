@@ -52,6 +52,7 @@ module "ecs" {
   db_username            = var.db_username
   db_password            = var.db_password
   redis_endpoint         = module.elasticache.primary_endpoint
+  extra_environment      = var.extra_environment
 }
 
 module "rds" {
