@@ -1,6 +1,0 @@
-region          = "ap-northeast-2"
-container_image = "851957594139.dkr.ecr.ap-northeast-2.amazonaws.com/farmily-api:latest"
-db_name         = "farmily"
-db_username     = "admin"
-db_password     = "urbanworkteam"
-s3_bucket_name  = "farmily-s3-bucket"
