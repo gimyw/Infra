@@ -15,7 +15,20 @@ resource "aws_cloudfront_distribution" "main" {
     origin_id                = "s3-origin"
     origin_access_control_id = aws_cloudfront_origin_access_control.main.id
   }
-
+  custom_error_response {
+      error_code            = 403
+      response_code         = 200
+      response_page_path    = "/index.html"
+      error_caching_min_ttl = 0 
+  }
+    
+    custom_error_response {
+      error_code            = 404
+      response_code         = 200
+      response_page_path    = "/index.html"
+      error_caching_min_ttl = 0
+  }
+  
   default_cache_behavior {
     allowed_methods        = ["GET", "HEAD"]
     cached_methods         = ["GET", "HEAD"]
