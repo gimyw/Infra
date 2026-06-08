@@ -72,6 +72,7 @@ module "ecs" {
   ecs_security_group_ids = [module.sg.ecs_sg_id]
   alb_security_group_ids = [module.sg.alb_sg_id]
   spring_profile         = "dev"
+  enable_https           = true
   alb_certificate_arn    = module.acm_alb.certificate_arn
   db_address             = module.rds.address
   db_name                = var.db_name

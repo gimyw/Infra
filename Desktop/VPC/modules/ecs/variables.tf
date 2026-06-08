@@ -59,7 +59,13 @@ variable "alb_security_group_ids" {
 variable "alb_certificate_arn" {
   type = string
   default = ""
-  description = "ACM ARN, 빈 값이면 HTTPS 미사용 (HTTP Only)"
+  description = "ACM ARN. enable_https = true 일 때 443 리스너에 부착."
+}
+
+variable "enable_https" {
+  type        = bool
+  default     = false
+  description = "true면 443 리스너 + HTTP->HTTPS 301 활성화. count/for_each는 plan 시점에 알아야 하므로 ARN 대신 이 플래그로 제어."
 }
 
 variable "spring_profile" {
