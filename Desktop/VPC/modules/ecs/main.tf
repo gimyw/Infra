@@ -43,12 +43,27 @@ resource "aws_ecs_task_definition" "app" {
   }
 }
 
+resource "aws_ecs_cluster_capacity_providers" "main" {
+  cluster_name       = aws_ecs_cluster.main.name
+  capacity_providers = ["FARGATE", "FARGATE_SPOT"]
+}
+
 resource "aws_ecs_service" "app" {
   name            = "${var.env}-app-service"
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.app.arn
   desired_count   = var.desired_count
-  launch_type     = "FARGATE"
+
+  capacity_provider_strategy {
+    capacity_provider = "FARGATE"
+    weight            = 1
+    base              = var.desired_count
+  }
+
+  capacity_provider_strategy {
+    capacity_provider = "FARGATE_SPOT"
+    weight            = 4
+  }
 
   network_configuration {
     subnets         = var.private_subnet_ids
@@ -62,10 +77,36 @@ resource "aws_ecs_service" "app" {
   }
 
   lifecycle {
-      ignore_changes = [task_definition]
+    ignore_changes = [task_definition, desired_count]
   }
-  
-  depends_on = [aws_lb_listener.http,aws_lb_listener.https]
+
+  depends_on = [aws_lb_listener.http, aws_lb_listener.https]
+}
+
+# Auto Scaling
+resource "aws_appautoscaling_target" "ecs" {
+  count              = var.enable_autoscaling ? 1 : 0
+  service_namespace  = "ecs"
+  resource_id        = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.app.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  min_capacity       = var.desired_count
+  max_capacity       = var.max_count
+}
+
+resource "aws_appautoscaling_policy" "cpu" {
+  count              = var.enable_autoscaling ? 1 : 0
+  name               = "${var.env}-cpu-scaling"
+  service_namespace  = "ecs"
+  resource_id        = aws_appautoscaling_target.ecs[0].resource_id
+  scalable_dimension = "ecs:service:DesiredCount"
+  policy_type        = "TargetTrackingScaling"
+
+  target_tracking_scaling_policy_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "ECSServiceAverageCPUUtilization"
+    }
+    target_value = 70.0
+  }
 }
 
 # ALB
