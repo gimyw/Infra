@@ -21,7 +21,8 @@ resource "aws_s3_bucket_public_access_block" "main" {
 }
 
 resource "aws_s3_bucket_cors_configuration" "main" {
-  bucket                  = aws_s3_bucket.main.id
+  count  = length(var.cors_allowed_origins) > 0 ? 1 : 0
+  bucket = aws_s3_bucket.main.id
   cors_rule {
     allowed_origins = var.cors_allowed_origins
     allowed_methods = ["GET","PUT","POST","HEAD"]
