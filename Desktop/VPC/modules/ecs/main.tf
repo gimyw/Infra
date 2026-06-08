@@ -53,7 +53,7 @@ resource "aws_ecs_service" "app" {
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.app.arn
   desired_count   = var.desired_count
-
+  health_check_grace_period_seconds = 180 # 180초 동안 ELB 헬스 체크 무시
   capacity_provider_strategy {
     capacity_provider = "FARGATE"
     weight            = 1
