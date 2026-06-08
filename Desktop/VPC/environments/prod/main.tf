@@ -133,19 +133,28 @@ module "elasticache" {
   num_cache_clusters = 2
 }
 
+# 업로드 전용 버킷 (앱 presigned, CORS 필요 - 디지털명함/Expo 웹이 이미지 직접 GET/PUT)
 module "s3" {
   source = "../../modules/s3"
 
-  env                        = "prod"
-  bucket_name                = var.s3_bucket_name
-  cors_allowed_origins = ["http://localhost:3000","https://farmily.info","https://www.farmily.info"]
+  env                  = "prod"
+  bucket_name          = var.s3_bucket_name
+  cors_allowed_origins = ["http://localhost:3000", "https://farmily.info", "https://www.farmily.info"]
+}
+
+# 프론트(디지털명함) 정적 웹 전용 버킷 (CloudFront 오리진, CORS 불필요)
+module "s3_web" {
+  source = "../../modules/s3"
+
+  env         = "prod"
+  bucket_name = "farmily-prod-frontend-web"
 }
 
 module "cloudfront" {
   source = "../../modules/cloudfront"
 
   env                   = "prod"
-  s3_bucket_domain_name = module.s3.bucket_domain_name
+  s3_bucket_domain_name = module.s3_web.bucket_domain_name
   aliases               = concat([var.web_domain], var.web_domain_aliases)
   acm_certificate_arn   = module.acm_cloudfront.certificate_arn
 }
@@ -175,8 +184,7 @@ module "cloudwatch" {
 }
 
 resource "aws_s3_bucket_policy" "frontend_oac"{
-  #bucket_id 오타 수정
-  bucket = module.s3.bucket_id
+  bucket = module.s3_web.bucket_id
 
   policy = jsonencode({
       Version = "2012-10-17"
@@ -184,7 +192,7 @@ resource "aws_s3_bucket_policy" "frontend_oac"{
         Effect    = "Allow"
         Principal = { Service = "cloudfront.amazonaws.com" }
         Action    = "s3:GetObject"
-        Resource  = "${module.s3.bucket_arn}/*"
+        Resource  = "${module.s3_web.bucket_arn}/*"
         Condition = {
           StringEquals = {
             "AWS:SourceArn" = module.cloudfront.distribution_arn
