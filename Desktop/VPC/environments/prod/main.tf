@@ -13,6 +13,38 @@ provider "aws" {
   region = var.region
 }
 
+# CloudFront용 ACM 인증서는 반드시 us-east-1 에 있어야 함
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
+}
+
+# Route53에서 도메인 구매 시 자동 생성된 호스팅 영역 참조 (새로 만들지 않음)
+data "aws_route53_zone" "main" {
+  name         = var.domain_name
+  private_zone = false
+}
+
+# ALB(앱/API)용 인증서 - 서울 리전
+module "acm_alb" {
+  source = "../../modules/acm"
+
+  domain_name = var.api_domain
+  zone_id     = data.aws_route53_zone.main.zone_id
+}
+
+# CloudFront(정적 웹)용 인증서 - us-east-1
+module "acm_cloudfront" {
+  source = "../../modules/acm"
+  providers = {
+    aws = aws.us_east_1
+  }
+
+  domain_name               = var.web_domain
+  subject_alternative_names = var.web_domain_aliases
+  zone_id                   = data.aws_route53_zone.main.zone_id
+}
+
 locals {
   app_environment = concat(
     var.extra_environment,
@@ -64,6 +96,7 @@ module "ecs" {
   ecs_security_group_ids = [module.sg.ecs_sg_id]
   alb_security_group_ids = [module.sg.alb_sg_id]
   spring_profile         = "prod"
+  alb_certificate_arn    = module.acm_alb.certificate_arn
   db_address             = module.rds.address
   db_name                = var.db_name
   db_username            = var.db_username
@@ -110,6 +143,23 @@ module "cloudfront" {
 
   env                   = "prod"
   s3_bucket_domain_name = module.s3.bucket_domain_name
+  aliases               = concat([var.web_domain], var.web_domain_aliases)
+  acm_certificate_arn   = module.acm_cloudfront.certificate_arn
+}
+
+module "route53" {
+  source = "../../modules/route53"
+
+  zone_id = data.aws_route53_zone.main.zone_id
+
+  # 앱/API -> ALB 직접
+  alb_dns_name     = module.ecs.alb_dns_name
+  alb_zone_id      = module.ecs.alb_zone_id
+  alb_record_names = [var.api_domain]
+
+  # 정적 웹 -> CloudFront
+  cloudfront_domain_name  = module.cloudfront.distribution_domain_name
+  cloudfront_record_names = concat([var.web_domain], var.web_domain_aliases)
 }
 
 module "cloudwatch" {
