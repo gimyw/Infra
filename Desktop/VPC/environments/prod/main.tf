@@ -137,6 +137,7 @@ module "s3" {
 
   env                        = "prod"
   bucket_name                = var.s3_bucket_name
+  cors_allowed_origins = ["http://localhost:3000","https://farmily.info","https://www.farmily.info"]
 }
 
 module "cloudfront" {
