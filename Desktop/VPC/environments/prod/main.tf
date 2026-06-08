@@ -90,7 +90,7 @@ module "ecs" {
   public_subnet_ids      = [module.vpc.public_subnet_a_id, module.vpc.public_subnet_c_id]
   private_subnet_ids     = [module.vpc.private_subnet_a_id, module.vpc.private_subnet_c_id]
   container_image        = var.container_image
-  desired_count          = 0
+  desired_count          = 1
   max_count              = 8
   task_cpu               = "512"
   task_memory            = "1024"
