@@ -67,7 +67,8 @@ module "ecs" {
   public_subnet_ids      = [module.vpc.public_subnet_a_id, module.vpc.public_subnet_c_id]
   private_subnet_ids     = [module.vpc.private_subnet_a_id, module.vpc.private_subnet_c_id]
   container_image        = var.container_image
-  desired_count          = 1
+  desired_count          = 0
+  max_count              = 2
   ecs_security_group_ids = [module.sg.ecs_sg_id]
   alb_security_group_ids = [module.sg.alb_sg_id]
   spring_profile         = "dev"

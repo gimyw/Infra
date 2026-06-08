@@ -117,3 +117,15 @@ variable "bedrock_agent_resource_arns" {
   default     = ["*"]
   description = "Bedrock InvokeAgent 허용 리소스 ARN 목록. 콘솔에서 Agent 만든 후 특정 ARN으로 좁히는 것 권장."
 }
+
+variable "enable_autoscaling" {
+  type        = bool
+  default     = true
+  description = "오토스케일링 활성화 여부"
+}
+
+variable "max_count" {
+  type        = number
+  default     = 4
+  description = "오토스케일링 최대 태스크 수"
+}
