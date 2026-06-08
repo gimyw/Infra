@@ -116,7 +116,7 @@ module "rds" {
   private_subnet_ids = [module.vpc.private_subnet_a_id, module.vpc.private_subnet_c_id]
   security_group_ids = [module.sg.rds_sg_id]
   instance_class     = "db.t3.small"
-  allocated_storage  = 50
+  allocated_storage  = 20
   db_name            = var.db_name
   db_username        = var.db_username
   db_password        = var.db_password
