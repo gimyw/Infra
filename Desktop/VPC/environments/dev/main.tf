@@ -118,6 +118,7 @@ module "s3" {
 
   env         = "dev"
   bucket_name = "farmily-dev-s3-bucket"
+  cors_allowed_origins = ["http://localhost:3000", "https://farmily.info", "https://www.farmily.info"]
 }
 
 module "route53" {
