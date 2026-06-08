@@ -13,6 +13,20 @@ provider "aws" {
   region = var.region
 }
 
+# Route53에서 도메인 구매 시 자동 생성된 호스팅 영역 참조 (prod와 동일 zone)
+data "aws_route53_zone" "main" {
+  name         = var.domain_name
+  private_zone = false
+}
+
+# ALB(앱/API)용 인증서 - 서울 리전
+module "acm_alb" {
+  source = "../../modules/acm"
+
+  domain_name = var.api_domain
+  zone_id     = data.aws_route53_zone.main.zone_id
+}
+
 locals {
   app_environment = concat(
     var.extra_environment,
@@ -57,6 +71,7 @@ module "ecs" {
   ecs_security_group_ids = [module.sg.ecs_sg_id]
   alb_security_group_ids = [module.sg.alb_sg_id]
   spring_profile         = "dev"
+  alb_certificate_arn    = module.acm_alb.certificate_arn
   db_address             = module.rds.address
   db_name                = var.db_name
   db_username            = var.db_username
@@ -101,4 +116,15 @@ module "s3" {
 
   env         = "dev"
   bucket_name = "farmily-dev-s3-bucket"
+}
+
+module "route53" {
+  source = "../../modules/route53"
+
+  zone_id = data.aws_route53_zone.main.zone_id
+
+  # 앱/API -> ALB 직접 (dev는 CloudFront 미사용)
+  alb_dns_name     = module.ecs.alb_dns_name
+  alb_zone_id      = module.ecs.alb_zone_id
+  alb_record_names = [var.api_domain]
 }

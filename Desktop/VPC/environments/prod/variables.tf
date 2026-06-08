@@ -54,4 +54,29 @@ variable "bedrock_agent_alias_id" {
   description = "Bedrock Agent Alias ID."
 }
 
+# --- 도메인 / HTTPS ---
+variable "domain_name" {
+  type        = string
+  default     = "farmily.info"
+  description = "Route53 호스팅 영역(도메인). Route53에서 도메인 구매 시 자동 생성된 zone."
+}
+
+variable "web_domain" {
+  type        = string
+  default     = "farmily.info"
+  description = "CloudFront(정적 웹) 기본 도메인"
+}
+
+variable "web_domain_aliases" {
+  type        = list(string)
+  default     = ["www.farmily.info"]
+  description = "CloudFront 추가 도메인"
+}
+
+variable "api_domain" {
+  type        = string
+  default     = "api.farmily.info"
+  description = "ALB(앱/API) 도메인"
+}
+
 
