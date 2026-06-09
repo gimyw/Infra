@@ -5,6 +5,26 @@ resource "aws_db_subnet_group" "main" {
   tags = { Name = "${var.env}-db-subnet-group" }
 }
 
+resource "aws_iam_role" "rds_monitoring" {
+  count = var.monitoring_interval > 0 ? 1 : 0
+  name  = "${var.env}-rds-monitoring-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = { Service = "monitoring.rds.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "rds_monitoring" {
+  count      = var.monitoring_interval > 0 ? 1 : 0
+  role       = aws_iam_role.rds_monitoring[0].name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
+}
+
 resource "aws_db_instance" "main" {
   identifier              = "${var.env}-rds"
   engine                  = "postgres"
@@ -19,6 +39,8 @@ resource "aws_db_instance" "main" {
   multi_az                = var.multi_az
   skip_final_snapshot     = true
   backup_retention_period = var.multi_az ? 7 : 1
+  monitoring_interval     = var.monitoring_interval
+  monitoring_role_arn     = var.monitoring_interval > 0 ? aws_iam_role.rds_monitoring[0].arn : null
 
   tags = { Name = "${var.env}-rds" }
 }

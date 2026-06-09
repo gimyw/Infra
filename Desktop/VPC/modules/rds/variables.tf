@@ -42,3 +42,9 @@ variable "multi_az" {
   type    = bool
   default = false
 }
+
+variable "monitoring_interval" {
+  type        = number
+  default     = 0
+  description = "Enhanced Monitoring 수집 간격(초). 0이면 비활성. 허용값: 0, 1, 5, 10, 15, 30, 60"
+}

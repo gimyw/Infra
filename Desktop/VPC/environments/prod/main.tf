@@ -120,7 +120,8 @@ module "rds" {
   db_name            = var.db_name
   db_username        = var.db_username
   db_password        = var.db_password
-  multi_az           = true
+  multi_az            = true
+  monitoring_interval = 30
 }
 
 module "elasticache" {
