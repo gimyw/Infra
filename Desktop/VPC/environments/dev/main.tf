@@ -67,8 +67,10 @@ module "ecs" {
   public_subnet_ids      = [module.vpc.public_subnet_a_id, module.vpc.public_subnet_c_id]
   private_subnet_ids     = [module.vpc.private_subnet_a_id, module.vpc.private_subnet_c_id]
   container_image        = var.container_image
-  desired_count          = 0
+  desired_count          = 1
   max_count              = 2
+  task_cpu               = "512"
+  task_memory            = "1024"
   ecs_security_group_ids = [module.sg.ecs_sg_id]
   alb_security_group_ids = [module.sg.alb_sg_id]
   spring_profile         = "dev"
@@ -93,6 +95,7 @@ module "rds" {
   db_username        = var.db_username
   db_password        = var.db_password
   multi_az           = false
+  monitoring_interval = 30
 }
 
 module "elasticache" {
@@ -130,4 +133,15 @@ module "route53" {
   alb_dns_name     = module.ecs.alb_dns_name
   alb_zone_id      = module.ecs.alb_zone_id
   alb_record_names = [var.api_domain]
+}
+
+module "ecs_scheduler" {
+  source = "../../modules/ecs-scheduler"
+
+  env              = "dev"
+  region           = var.region
+  ecs_cluster_name = "dev-cluster"
+  ecs_service_name = "dev-app-service"
+  start_schedule   = "cron(0 9 ? * MON-FRI *)"
+  stop_schedule    = "cron(0 18 ? * MON-FRI *)"
 }
