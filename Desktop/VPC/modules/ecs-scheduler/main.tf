@@ -51,6 +51,11 @@ resource "aws_iam_role_policy" "lambda" {
       },
       {
         Effect   = "Allow"
+        Action   = ["application-autoscaling:RegisterScalableTarget"]
+        Resource = "*"
+      },
+      {
+        Effect   = "Allow"
         Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
         Resource = "arn:aws:logs:${var.region}:${data.aws_caller_identity.current.account_id}:*"
       }
