@@ -71,6 +71,16 @@ resource "aws_security_group" "rds" {
     }
   }
 
+  dynamic "ingress" {
+    for_each = var.enable_noti_lambda_sg ? [1] : []
+    content {
+      from_port       = 5432
+      to_port         = 5432
+      protocol        = "tcp"
+      security_groups = [aws_security_group.noti_lambda[0].id]
+    }
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -119,4 +129,22 @@ resource "aws_security_group" "lambda" {
   }
 
   tags = { Name = "${var.env}-lambda-sg" }
+}
+
+resource "aws_security_group" "noti_lambda" {
+  count       = var.enable_noti_lambda_sg ? 1 : 0
+  name        = "${var.env}-noti-lambda-sg"
+  description = "Notification Producer Lambda RDS access"
+  vpc_id      = var.vpc_id
+
+  # 인바운드 없음 (소스 SG로만 사용)
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = { Name = "${var.env}-noti-lambda-sg" }
 }

@@ -77,9 +77,10 @@ module "vpc" {
 module "sg" {
   source = "../../modules/sg"
 
-  env              = "prod"
-  vpc_id           = module.vpc.vpc_id
-  enable_lambda_sg = true
+  env                   = "prod"
+  vpc_id                = module.vpc.vpc_id
+  enable_lambda_sg      = true
+  enable_noti_lambda_sg = true
 }
 
 module "ecs" {
