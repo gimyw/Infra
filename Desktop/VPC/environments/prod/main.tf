@@ -107,6 +107,7 @@ module "ecs" {
   extra_environment      = local.app_environment
   s3_bucket_arn          = module.s3.bucket_arn
   enable_bedrock         = var.ai_provider == "bedrock"
+  enable_container_insights = true
 }
 
 module "rds" {
