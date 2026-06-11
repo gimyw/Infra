@@ -21,3 +21,7 @@ output "cloudfront_domain" {
 output "rds_replica_address" {
   value = module.rds.replica_address
 }
+
+output "noti_lambda_sg_id" {
+  value = module.sg.noti_lambda_sg_id
+}

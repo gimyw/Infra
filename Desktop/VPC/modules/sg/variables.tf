@@ -10,3 +10,8 @@ variable "enable_lambda_sg" {
   type    = bool
   default = false
 }
+
+variable "enable_noti_lambda_sg" {
+  type    = bool
+  default = false
+}
