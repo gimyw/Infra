@@ -130,6 +130,12 @@ variable "enable_autoscaling" {
   description = "오토스케일링 활성화 여부"
 }
 
+variable "enable_container_insights" {
+  type        = bool
+  default     = false
+  description = "true면 ECS Container Insights 활성화 (RunningTaskCount·per-task CPU/Mem 커스텀 메트릭 수집, CloudWatch 과금 발생). 기본 off = FinOps."
+}
+
 variable "max_count" {
   type        = number
   default     = 4

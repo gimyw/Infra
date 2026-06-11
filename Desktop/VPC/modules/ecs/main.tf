@@ -1,5 +1,13 @@
 resource "aws_ecs_cluster" "main" {
   name = "${var.env}-cluster"
+
+  dynamic "setting" {
+    for_each = var.enable_container_insights ? [1] : []
+    content {
+      name  = "containerInsights"
+      value = "enabled"
+    }
+  }
 }
 
 resource "aws_ecs_task_definition" "app" {
