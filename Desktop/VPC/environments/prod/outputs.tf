@@ -17,3 +17,7 @@ output "redis_endpoint" {
 output "cloudfront_domain" {
   value = module.cloudfront.distribution_domain_name
 }
+
+output "rds_replica_address" {
+  value = module.rds.replica_address
+}

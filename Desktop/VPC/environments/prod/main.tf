@@ -49,12 +49,12 @@ locals {
   app_environment = concat(
     var.extra_environment,
     [
-      { name = "S3_BUCKET",              value = module.s3.bucket_id },
-      { name = "S3_REGION",              value = var.region },
-      { name = "CDN_BASE_URL",           value = "https://${module.cloudfront.distribution_domain_name}" },
-      { name = "AI_PROVIDER",            value = var.ai_provider },
-      { name = "AWS_REGION",             value = var.bedrock_region },
-      { name = "BEDROCK_AGENT_ID",       value = var.bedrock_agent_id },
+      { name = "S3_BUCKET", value = module.s3.bucket_id },
+      { name = "S3_REGION", value = var.region },
+      { name = "CDN_BASE_URL", value = "https://${module.cloudfront.distribution_domain_name}" },
+      { name = "AI_PROVIDER", value = var.ai_provider },
+      { name = "AWS_REGION", value = var.bedrock_region },
+      { name = "BEDROCK_AGENT_ID", value = var.bedrock_agent_id },
       { name = "BEDROCK_AGENT_ALIAS_ID", value = var.bedrock_agent_alias_id },
     ]
   )
@@ -84,45 +84,46 @@ module "sg" {
 module "ecs" {
   source = "../../modules/ecs"
 
-  env                    = "prod"
-  region                 = var.region
-  vpc_id                 = module.vpc.vpc_id
-  public_subnet_ids      = [module.vpc.public_subnet_a_id, module.vpc.public_subnet_c_id]
-  private_subnet_ids     = [module.vpc.private_subnet_a_id, module.vpc.private_subnet_c_id]
-  container_image        = var.container_image
-  desired_count          = 1
-  max_count              = 8
-  task_cpu               = "512"
-  task_memory            = "1024"
-  ecs_security_group_ids = [module.sg.ecs_sg_id]
-  alb_security_group_ids = [module.sg.alb_sg_id]
-  spring_profile         = "prod"
-  enable_https           = true
-  alb_certificate_arn    = module.acm_alb.certificate_arn
-  db_address             = module.rds.address
-  db_name                = var.db_name
-  db_username            = var.db_username
-  db_password            = var.db_password
-  redis_endpoint         = module.elasticache.primary_endpoint
-  extra_environment      = local.app_environment
-  s3_bucket_arn          = module.s3.bucket_arn
-  enable_bedrock         = var.ai_provider == "bedrock"
+  env                       = "prod"
+  region                    = var.region
+  vpc_id                    = module.vpc.vpc_id
+  public_subnet_ids         = [module.vpc.public_subnet_a_id, module.vpc.public_subnet_c_id]
+  private_subnet_ids        = [module.vpc.private_subnet_a_id, module.vpc.private_subnet_c_id]
+  container_image           = var.container_image
+  desired_count             = 1
+  max_count                 = 8
+  task_cpu                  = "512"
+  task_memory               = "1024"
+  ecs_security_group_ids    = [module.sg.ecs_sg_id]
+  alb_security_group_ids    = [module.sg.alb_sg_id]
+  spring_profile            = "prod"
+  enable_https              = true
+  alb_certificate_arn       = module.acm_alb.certificate_arn
+  db_address                = module.rds.address
+  db_name                   = var.db_name
+  db_username               = var.db_username
+  db_password               = var.db_password
+  redis_endpoint            = module.elasticache.primary_endpoint
+  extra_environment         = local.app_environment
+  s3_bucket_arn             = module.s3.bucket_arn
+  enable_bedrock            = var.ai_provider == "bedrock"
   enable_container_insights = true
 }
 
 module "rds" {
   source = "../../modules/rds"
 
-  env                = "prod"
-  private_subnet_ids = [module.vpc.private_subnet_a_id, module.vpc.private_subnet_c_id]
-  security_group_ids = [module.sg.rds_sg_id]
-  instance_class     = "db.t3.small"
-  allocated_storage  = 20
-  db_name            = var.db_name
-  db_username        = var.db_username
-  db_password        = var.db_password
+  env                 = "prod"
+  private_subnet_ids  = [module.vpc.private_subnet_a_id, module.vpc.private_subnet_c_id]
+  security_group_ids  = [module.sg.rds_sg_id]
+  instance_class      = "db.t3.small"
+  allocated_storage   = 20
+  db_name             = var.db_name
+  db_username         = var.db_username
+  db_password         = var.db_password
   multi_az            = true
   monitoring_interval = 30
+  enable_read_replica = true
 }
 
 module "elasticache" {
@@ -185,21 +186,21 @@ module "cloudwatch" {
   rds_instance_id  = "prod-rds"
 }
 
-resource "aws_s3_bucket_policy" "frontend_oac"{
+resource "aws_s3_bucket_policy" "frontend_oac" {
   bucket = module.s3_web.bucket_id
 
   policy = jsonencode({
-      Version = "2012-10-17"
-      Statement = [{
-        Effect    = "Allow"
-        Principal = { Service = "cloudfront.amazonaws.com" }
-        Action    = "s3:GetObject"
-        Resource  = "${module.s3_web.bucket_arn}/*"
-        Condition = {
-          StringEquals = {
-            "AWS:SourceArn" = module.cloudfront.distribution_arn
-          }
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "cloudfront.amazonaws.com" }
+      Action    = "s3:GetObject"
+      Resource  = "${module.s3_web.bucket_arn}/*"
+      Condition = {
+        StringEquals = {
+          "AWS:SourceArn" = module.cloudfront.distribution_arn
         }
-      }]
-    })
+      }
+    }]
+  })
 }

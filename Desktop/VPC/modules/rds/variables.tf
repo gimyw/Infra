@@ -48,3 +48,13 @@ variable "monitoring_interval" {
   default     = 0
   description = "Enhanced Monitoring 수집 간격(초). 0이면 비활성. 허용값: 0, 1, 5, 10, 15, 30, 60"
 }
+
+variable "enable_read_replica" {
+  type    = bool
+  default = false
+}
+
+variable "replica_instance_class" {
+  type    = string
+  default = "db.t3.small"
+}

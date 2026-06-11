@@ -25,6 +25,23 @@ resource "aws_iam_role_policy_attachment" "rds_monitoring" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
 }
 
+
+resource "aws_db_instance" "replica" {
+  count = var.enable_read_replica ? 1 : 0
+
+  identifier             = "${var.env}-rds-replica"
+  replicate_source_db    = aws_db_instance.main.arn
+  instance_class         = var.replica_instance_class
+  db_subnet_group_name   = aws_db_subnet_group.main.name
+  vpc_security_group_ids = var.security_group_ids
+  multi_az               = false
+  publicly_accessible    = false
+  skip_final_snapshot    = true
+  monitoring_interval    = 0
+
+  tags = { Name = "${var.env}-rds-replica" }
+}
+
 resource "aws_db_instance" "main" {
   identifier              = "${var.env}-rds"
   engine                  = "postgres"
@@ -44,3 +61,4 @@ resource "aws_db_instance" "main" {
 
   tags = { Name = "${var.env}-rds" }
 }
+
