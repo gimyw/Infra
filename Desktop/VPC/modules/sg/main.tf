@@ -61,6 +61,16 @@ resource "aws_security_group" "rds" {
     security_groups = [aws_security_group.ecs.id]
   }
 
+  dynamic "ingress" {
+    for_each = var.enable_lambda_sg ? [1] : []
+    content {
+      from_port       = 5432
+      to_port         = 5432
+      protocol        = "tcp"
+      security_groups = [aws_security_group.lambda[0].id]
+    }
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -91,4 +101,22 @@ resource "aws_security_group" "redis" {
   }
 
   tags = { Name = "${var.env}-redis-sg" }
+}
+
+resource "aws_security_group" "lambda" {
+  count       = var.enable_lambda_sg ? 1 : 0
+  name        = "${var.env}-lambda-sg"
+  description = "Lambda functions RDS access"
+  vpc_id      = var.vpc_id
+
+  # 인바운드 없음 (Lambda는 아웃바운드로 RDS에 접속)
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = { Name = "${var.env}-lambda-sg" }
 }
