@@ -81,6 +81,19 @@ resource "aws_security_group" "rds" {
     }
   }
 
+  # AgentCore -> RDS (5432). agentcore_sg_id 가 주어졌을 때만 추가.
+  # ⚠️ inline ingress 라 TF 가 RDS 인바운드 전체를 소유 — 여기 정의되지 않은 소스(예: 콘솔로 붙은 relay)는 apply 시 제거됨.
+  dynamic "ingress" {
+    for_each = var.agentcore_sg_id != "" ? [1] : []
+    content {
+      from_port       = 5432
+      to_port         = 5432
+      protocol        = "tcp"
+      security_groups = [var.agentcore_sg_id]
+      description     = "AgentCore to RDS"
+    }
+  }
+
   egress {
     from_port   = 0
     to_port     = 0

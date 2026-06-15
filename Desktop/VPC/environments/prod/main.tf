@@ -81,6 +81,35 @@ module "sg" {
   vpc_id                = module.vpc.vpc_id
   enable_lambda_sg      = true
   enable_noti_lambda_sg = true
+  agentcore_sg_id       = aws_security_group.agentcore.id # AgentCore->RDS(5432) 인바운드 추가
+}
+
+# AgentCore 서비스 SG — 콘솔로 먼저 생성(sg-02e5f7d4280c8b580)한 것을 terraform import 로 흡수.
+# ⚠️ 이름에 env 프리픽스(prod-)가 없는 이유: 콘솔 생성명 "farmily-agentcore-sg"를 그대로 둬야 import가 깨지지 않음
+#    (SG name 은 변경 불가 속성이라, 이름이 다르면 import 후 apply 가 destroy+create 로 재생성 시도 → 운영 중이면 위험).
+# 규칙은 실제 SG와 1:1 일치시켜 import 후 plan 이 zero-diff(또는 태그 1개만) 되도록 함.
+# AgentCore→RDS(5432) 인바운드는 별도(relay 드리프트 해결 후 분리형 ingress rule 로 추가) — 본 정의엔 미포함.
+resource "aws_security_group" "agentcore" {
+  name        = "farmily-agentcore-sg"
+  description = "AgentCore ECS security group"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress {
+    description = "Backend calls AgentCore"
+    from_port   = 8080
+    to_port     = 8080
+    protocol    = "tcp"
+    cidr_blocks = ["10.1.0.0/16"] # VPC 내부에서 호출 (실제 SG 규칙과 동일)
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = { Name = "farmily-agentcore-sg" }
 }
 
 module "ecs" {
@@ -155,6 +184,17 @@ module "s3_web" {
   bucket_name = "farmily-prod-frontend-web"
 }
 
+# AI 디지털명함 HTML 템플릿 버킷 — 콘솔로 먼저 생성(farmily-templates, template_a/*.html 보유)한 것을 import 로 흡수.
+# CORS 미설정(빈 배열) = 현 버킷과 동일. PAB 4종 true 도 모듈 기본과 일치.
+# ⚠️ import 후 plan 에서 2가지 delta 예상(둘 다 무해/개선): ① Name=prod-s3 태그 추가 ② 버저닝 Enabled
+#    (현 버킷은 버저닝 비활성 → 모듈이 Enabled 적용. 템플릿 덮어쓰기 복구 가능해지는 의도된 개선).
+module "s3_templates" {
+  source = "../../modules/s3"
+
+  env         = "prod"
+  bucket_name = "farmily-templates"
+}
+
 module "cloudfront" {
   source = "../../modules/cloudfront"
 
@@ -186,6 +226,18 @@ module "cloudwatch" {
   ecs_cluster_name = "prod-cluster"
   ecs_service_name = "prod-app-service"
   rds_instance_id  = "prod-rds"
+}
+
+# ALB L7 방어 — AWS WAF(rate-limit + AWS managed 룰). Shield Standard(L3/L4)는 자동.
+# common_rule_action="count": SQLi/XSS 룰은 초기 관측 → 오탐 검증 후 "none"(차단)으로 승격.
+module "waf" {
+  source = "../../modules/waf"
+
+  env                = "prod"
+  alb_arn            = module.ecs.alb_arn
+  rate_limit_global  = 2000 # AWS SRT 권장 예시값
+  rate_limit_auth    = 100  # 로그인 brute-force, 로그 보고 10~50으로 조임
+  common_rule_action = "count"
 }
 
 resource "aws_s3_bucket_policy" "frontend_oac" {
