@@ -237,7 +237,7 @@ module "waf" {
   alb_arn            = module.ecs.alb_arn
   rate_limit_global  = 2000 # AWS SRT 권장 예시값
   rate_limit_auth    = 100  # 로그인 brute-force, 로그 보고 10~50으로 조임
-  common_rule_action = "count"
+  common_rule_action = "none" # 2026-06-15 Count 관측(오탐0, .git 스캐너만 매치) 후 Block 승격
 }
 
 resource "aws_s3_bucket_policy" "frontend_oac" {
