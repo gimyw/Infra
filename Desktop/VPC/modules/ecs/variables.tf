@@ -57,8 +57,8 @@ variable "alb_security_group_ids" {
 }
 
 variable "alb_certificate_arn" {
-  type = string
-  default = ""
+  type        = string
+  default     = ""
   description = "ACM ARN. enable_https = true 일 때 443 리스너에 부착."
 }
 
@@ -69,7 +69,7 @@ variable "enable_https" {
 }
 
 variable "spring_profile" {
-  type = string
+  type    = string
   default = "prod"
 }
 
@@ -78,7 +78,7 @@ variable "db_address" {
 }
 
 variable "db_port" {
-  type = number
+  type    = number
   default = 5432
 }
 
@@ -86,8 +86,8 @@ variable "db_name" {
   type = string
 }
 
-variable "db_username" { 
-  type = string
+variable "db_username" {
+  type      = string
   sensitive = true
 }
 
@@ -97,14 +97,26 @@ variable "db_password" {
 }
 
 variable "redis_endpoint" {
-  type = string
+  type    = string
   default = ""
 }
 
 variable "extra_environment" {
-  type = list(object({ name = string, value = string}))
-  default = []
-  description = "JWT_SECRET , KAKAO_*, PORTONE_* 등 추가 env 평문 주입"
+  type        = list(object({ name = string, value = string }))
+  default     = []
+  description = "비민감 추가 env(공개 식별자·플래그: KAKAO_CLIENT_ID·*_REDIRECT_URI·*_TEST_MODE 등)만. 민감값은 app_secrets로."
+}
+
+variable "app_secrets" {
+  type        = list(object({ name = string, valueFrom = string }))
+  default     = []
+  description = "Secrets Manager 참조 주입(secrets[]). DB_PASSWORD·JWT_SECRET·KAKAO_*·PORTONE_*·KMA_SERVICE_KEY·FCM_* 등 민감값은 평문 env가 아니라 이걸로."
+}
+
+variable "app_secret_arn_patterns" {
+  type        = list(string)
+  default     = []
+  description = "execution role의 secretsmanager:GetSecretValue 허용 ARN(최소권한). 비면 정책 미생성."
 }
 
 variable "s3_bucket_arn" {
