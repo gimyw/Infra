@@ -45,10 +45,25 @@ module "acm_cloudfront" {
   zone_id                   = data.aws_route53_zone.main.zone_id
 }
 
+# 앱 시크릿(Secrets Manager) — 값이 아니라 ARN만 참조(평문 노출 없음). secrets[] 주입·정책에 사용.
+data "aws_secretsmanager_secret" "app" {
+  name = "farmily/prod/app"
+}
+
 locals {
-  app_environment = concat(
-    var.extra_environment,
-    [
+  app_secret_keys = [
+    "DB_PASSWORD", "JWT_SECRET", "KAKAO_CLIENT_SECRET", "KAKAO_ADMIN_KEY",
+    "KMA_SERVICE_KEY", "PORTONE_API_KEY", "PORTONE_API_SECRET",
+    "PORTONE_WEBHOOK_SECRET", "FCM_SERVICE_ACCOUNT_JSON",
+  ]
+  app_secrets = [for k in local.app_secret_keys : {
+    name      = k
+    valueFrom = "${data.aws_secretsmanager_secret.app.arn}:${k}::"
+  }]
+
+  # 민감 키는 env에서 제외(secrets[]로만 주입) — tfvars에 값이 남아 있어도 평문 env로 새거나 secrets와 중복되지 않게 방어
+  app_environment = [
+    for e in concat(var.extra_environment, [
       { name = "S3_BUCKET", value = module.s3.bucket_id },
       { name = "S3_REGION", value = var.region },
       { name = "CDN_BASE_URL", value = "https://${module.cloudfront.distribution_domain_name}" },
@@ -56,8 +71,8 @@ locals {
       { name = "AWS_REGION", value = var.bedrock_region },
       { name = "BEDROCK_AGENT_ID", value = var.bedrock_agent_id },
       { name = "BEDROCK_AGENT_ALIAS_ID", value = var.bedrock_agent_alias_id },
-    ]
-  )
+    ]) : e if !contains(local.app_secret_keys, e.name)
+  ]
 }
 
 module "vpc" {
@@ -136,6 +151,8 @@ module "ecs" {
   db_password               = var.db_password
   redis_endpoint            = module.elasticache.primary_endpoint
   extra_environment         = local.app_environment
+  app_secrets               = local.app_secrets
+  app_secret_arn_patterns   = [data.aws_secretsmanager_secret.app.arn]
   s3_bucket_arn             = module.s3.bucket_arn
   enable_bedrock            = var.ai_provider == "bedrock"
   enable_container_insights = true
@@ -235,8 +252,8 @@ module "waf" {
 
   env                = "prod"
   alb_arn            = module.ecs.alb_arn
-  rate_limit_global  = 2000 # AWS SRT 권장 예시값
-  rate_limit_auth    = 100  # 로그인 brute-force, 로그 보고 10~50으로 조임
+  rate_limit_global  = 2000   # AWS SRT 권장 예시값
+  rate_limit_auth    = 100    # 로그인 brute-force, 로그 보고 10~50으로 조임
   common_rule_action = "none" # 2026-06-15 Count 관측(오탐0, .git 스캐너만 매치) 후 Block 승격
 }
 
