@@ -128,6 +128,26 @@ resource "aws_wafv2_web_acl" "alb" {
       managed_rule_group_statement {
         vendor_name = "AWS"
         name        = "AWSManagedRulesCommonRuleSet"
+
+        # 카카오 로그인 경로는 CommonRuleSet 평가에서 제외
+        # 해당 경로는 rate-limit-auth + known-bad-inputs + ip-reputation 으로 계속 보호
+        scope_down_statement {
+          not_statement {
+            statement {
+              byte_match_statement {
+                search_string         = "/api/v1/auth/kakao"
+                positional_constraint = "STARTS_WITH"
+                field_to_match {
+                  uri_path {}
+                }
+                text_transformation {
+                  priority = 0
+                  type     = "LOWERCASE"
+                }
+              }
+            }
+          }
+        }
       }
     }
     visibility_config {
