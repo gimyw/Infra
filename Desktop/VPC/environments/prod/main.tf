@@ -66,7 +66,7 @@ locals {
     for e in concat(var.extra_environment, [
       { name = "S3_BUCKET", value = module.s3.bucket_id },
       { name = "S3_REGION", value = var.region },
-      { name = "CDN_BASE_URL", value = "https://${module.cloudfront.distribution_domain_name}" },
+      { name = "CDN_BASE_URL", value = "https://${aws_cloudfront_distribution.images.domain_name}" },
       { name = "AI_PROVIDER", value = var.ai_provider },
       { name = "AWS_REGION", value = var.bedrock_region },
       { name = "BEDROCK_AGENT_ID", value = var.bedrock_agent_id },
@@ -275,3 +275,66 @@ resource "aws_s3_bucket_policy" "frontend_oac" {
     }]
   })
 }
+
+# 이미지 업로드/AI카드 전용, CloudFront - farmily-s3-bucket 전체를 OAC로 서빙
+resource "aws_cloudfront_origin_access_control" "images" {
+  name                              = "prod-image-oac"
+  origin_access_control_origin_type = "s3"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
+}
+
+resource "aws_cloudfront_distribution" "images" {
+  enabled = true
+
+  origin {
+    domain_name              = module.s3.bucket_domain_name # farmily-s3-bucket 리전 도메인
+    origin_id                = "images-s3-origin"
+    origin_access_control_id = aws_cloudfront_origin_access_control.images.id
+  }
+
+  default_cache_behavior {
+    allowed_methods        = ["GET", "HEAD"]
+    cached_methods         = ["GET", "HEAD"]
+    target_origin_id       = "images-s3-origin"
+    viewer_protocol_policy = "redirect-to-https"
+
+    forwarded_values {
+      query_string = false
+      cookies { forward = "none" }
+    }
+    min_ttl     = 0
+    default_ttl = 86400 # 1일 (카드/이미지는 한 번 쓰고 안 바뀜)
+    max_ttl     = 31536000
+  }
+
+  restrictions {
+    geo_restriction { restriction_type = "none" }
+  }
+
+  # 기본 *.cloudfront.net 도메인 사용 (커스텀 도메인 불필요)
+  viewer_certificate {
+    cloudfront_default_certificate = true
+  }
+
+  tags = { Name = "prod-images-cloudfront" }
+}
+
+resource "aws_s3_bucket_policy" "images_oac" {
+  bucket = module.s3.bucket_id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "cloudfront.amazonaws.com" }
+      Action    = "s3:GetObject"
+      Resource  = "${module.s3.bucket_arn}/*"
+      Condition = {
+        StringEquals = {
+          "AWS:SourceArn" = aws_cloudfront_distribution.images.arn
+        }
+      }
+    }]
+  })
+}
+
