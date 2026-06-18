@@ -17,3 +17,7 @@ output "alb_arn" {
 output "alb_zone_id" {
   value = aws_lb.main.zone_id
 }
+
+output "eks_target_group_arn" {
+  value = var.enable_eks_bluegreen ? aws_lb_target_group.eks[0].arn : null
+}
