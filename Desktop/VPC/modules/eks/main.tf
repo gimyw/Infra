@@ -111,18 +111,6 @@ resource "aws_eks_node_group" "default" {
    ]
    tags = { Name = "${var.env}-eks-ng"}
 }
-//ALB에서 파드 8080 SG 규칙
-resource "aws_security_group_rule" "alb_to_pods" {
-  // 들어오는 트래픽 규칙 (인바운드)
-  type              = "ingress"
-  from_port         = 8080
-  to_port           = 8080
-  protocol          = "tcp"
-  security_group_id = aws_eks_cluster.this.vpc_config[0].cluster_security_group_id
-  source_security_group_id = var.alb_sg_id
-  description       = "ALB to EKS pods (app port 8080)"  
-}
-
 //파드에 VPC IP부여
 resource "aws_eks_addon" "vpc_cni" {
     cluster_name = aws_eks_cluster.this.name
