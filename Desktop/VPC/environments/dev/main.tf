@@ -162,3 +162,19 @@ module "ecs_scheduler" {
   start_schedule   = "cron(0 9 ? * MON-FRI *)"
   stop_schedule    = "cron(0 18 ? * MON-FRI *)"
 }
+
+module "eks" {
+  source = "../../modules/eks"
+
+  env                = "dev"
+  region             = var.region
+  vpc_id             = module.vpc.vpc_id
+  private_subnet_ids = [module.vpc.private_subnet_a_id, module.vpc.private_subnet_c_id]
+  public_subnet_ids  = [module.vpc.public_subnet_a_id, module.vpc.public_subnet_c_id]
+  alb_sg_id          = module.sg.alb_sg_id
+
+  //dev 영역의 EKS 노드 개수 및 버전
+  cluster_version     = "1.35"
+  node_instance_types = ["t3.medium"] //dev는 small
+  node_desired_size   = 1
+}
