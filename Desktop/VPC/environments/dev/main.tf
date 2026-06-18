@@ -8,7 +8,7 @@ terraform {
     }
     kubernetes = {
       source  = "hashicorp/kubernetes"
-      version = "~> 2.30" 
+      version = "~> 2.30"
     }
     helm = {
       source  = "hashicorp/helm"
@@ -31,8 +31,9 @@ data "aws_route53_zone" "main" {
 module "acm_alb" {
   source = "../../modules/acm"
 
-  domain_name = var.api_domain
-  zone_id     = data.aws_route53_zone.main.zone_id
+  domain_name               = var.api_domain
+  subject_alternative_names = ["ecs.dev.farmily.info"]
+  zone_id                   = data.aws_route53_zone.main.zone_id
 }
 
 # 앱 시크릿(Secrets Manager) — 값이 아니라 ARN만 참조(평문 노출 없음). secrets[] 주입·정책에 사용.
@@ -108,6 +109,8 @@ module "ecs" {
   app_secrets             = local.app_secrets
   app_secret_arn_patterns = [data.aws_secretsmanager_secret.app.arn]
   s3_bucket_arn           = module.s3.bucket_arn
+  enable_eks_bluegreen    = true
+  ecs_only_host           = "ecs.dev.farmily.info"
 }
 
 module "rds" {
@@ -150,14 +153,13 @@ module "s3" {
 }
 
 module "route53" {
-  source = "../../modules/route53"
-
+  source  = "../../modules/route53"
   zone_id = data.aws_route53_zone.main.zone_id
 
   # 앱/API -> ALB 직접 (dev는 CloudFront 미사용)
   alb_dns_name     = module.ecs.alb_dns_name
   alb_zone_id      = module.ecs.alb_zone_id
-  alb_record_names = [var.api_domain]
+  alb_record_names = [var.api_domain, "ecs.dev.farmily.info"]
 }
 
 module "ecs_scheduler" {

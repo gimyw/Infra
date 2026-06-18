@@ -153,3 +153,13 @@ variable "max_count" {
   default     = 4
   description = "오토스케일링 최대 태스크 수"
 }
+
+variable "enable_eks_bluegreen" {
+  type        = bool
+  default     = false
+}
+
+variable "ecs_only_host" {
+  type        = string
+  default     = ""
+}
