@@ -51,8 +51,3 @@ variable "node_max_size" {
     type    = number
     default = 3
 }
-
-#EKS 파드에서 인바운드 허용에 사용한다.
-variable "alb_sg_id" {
-    type    = string
-}       

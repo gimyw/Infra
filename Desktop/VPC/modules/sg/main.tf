@@ -94,6 +94,18 @@ resource "aws_security_group" "rds" {
     }
   }
 
+  # EKS 파드 -> RDS (5432). eks_cluster_sg_id 가 주어졌을 때만 추가.
+  dynamic "ingress" {
+    for_each = var.eks_cluster_sg_id != "" ? [1] : []
+    content {
+      from_port       = 5432
+      to_port         = 5432
+      protocol        = "tcp"
+      security_groups = [var.eks_cluster_sg_id]
+      description     = "EKS pods to RDS"
+    }
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -114,6 +126,18 @@ resource "aws_security_group" "redis" {
     to_port         = 6379
     protocol        = "tcp"
     security_groups = [aws_security_group.ecs.id]
+  }
+
+  # EKS 파드 -> Redis (6379). eks_cluster_sg_id 가 주어졌을 때만 추가.
+  dynamic "ingress" {
+    for_each = var.eks_cluster_sg_id != "" ? [1] : []
+    content {
+      from_port       = 6379
+      to_port         = 6379
+      protocol        = "tcp"
+      security_groups = [var.eks_cluster_sg_id]
+      description     = "EKS pods to Redis"
+    }
   }
 
   egress {

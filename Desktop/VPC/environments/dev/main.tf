@@ -78,8 +78,9 @@ module "vpc" {
 module "sg" {
   source = "../../modules/sg"
 
-  env    = "dev"
-  vpc_id = module.vpc.vpc_id
+  env               = "dev"
+  vpc_id            = module.vpc.vpc_id
+  eks_cluster_sg_id = module.eks.cluster_security_group_id
 }
 
 module "ecs" {
@@ -181,7 +182,6 @@ module "eks" {
   vpc_id             = module.vpc.vpc_id
   private_subnet_ids = [module.vpc.private_subnet_a_id, module.vpc.private_subnet_c_id]
   public_subnet_ids  = [module.vpc.public_subnet_a_id, module.vpc.public_subnet_c_id]
-  alb_sg_id          = module.sg.alb_sg_id
 
   //dev 영역의 EKS 노드 개수 및 버전
   cluster_version     = "1.35"
