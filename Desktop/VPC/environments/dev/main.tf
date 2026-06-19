@@ -186,5 +186,5 @@ module "eks" {
   //dev 영역의 EKS 노드 개수 및 버전
   cluster_version     = "1.35"
   node_instance_types = ["t3.medium"] //dev는 small
-  node_desired_size   = 1
+  node_desired_size   = 2
 }

@@ -25,7 +25,7 @@ variable "s3_bucket_name" {
 }
 
 variable "extra_environment" {
-  type = list(object({ name = string, value = string}))
+  type    = list(object({ name = string, value = string }))
   default = []
   #plan 출력 시 값이 마스킹돼서 노출
   sensitive = true
