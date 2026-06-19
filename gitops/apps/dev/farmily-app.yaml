@@ -24,7 +24,7 @@ spec:
       serviceAccountName: farmily-app
       containers:
         - name: farmily-app
-          image: 851957594139.dkr.ecr.ap-northeast-2.amazonaws.com/farmily-api-dev:dev-f702539
+          image: 851957594139.dkr.ecr.ap-northeast-2.amazonaws.com/farmily-api-dev:dev-v2
           ports:
             - containerPort: 8080
           env:
