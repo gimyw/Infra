@@ -54,6 +54,12 @@ variable "bedrock_agent_alias_id" {
   description = "Bedrock Agent Alias ID."
 }
 
+variable "kakao_client_id" {
+  type        = string
+  default     = ""
+  description = "KaKao Client id"
+}
+
 # --- 도메인 / HTTPS ---
 variable "domain_name" {
   type        = string

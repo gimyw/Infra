@@ -1,0 +1,9 @@
+apiVersion: elbv2.k8s.aws/v1beta1
+kind: TargetGroupBinding
+metadata:
+  name: farmily-app
+  namespace: farmily-prod
+spec:
+  serviceRef: { name: farmily-app, port: 8080 }
+  targetGroupARN: arn:aws:elasticloadbalancing:ap-northeast-2:851957594139:targetgroup/prod-eks-tg/49fea87ed8029421
+  targetType: ip
