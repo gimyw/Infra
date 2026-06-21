@@ -13,7 +13,7 @@ spec:
       values: |
         clusterName: prod-eks
         region: ap-northeast-2
-        vpcId: __PROD_VPC_ID__        # TODO(apply 후): terraform output 또는 module.vpc.vpc_id 값으로 교체 (예: vpc-xxxxxxxx)
+        vpcId: vpc-08ee82b1191b9814c
         serviceAccount:
           create: true
           name: aws-load-balancer-controller
