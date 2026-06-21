@@ -111,6 +111,14 @@ resource "aws_secretsmanager_secret_version" "app_infra" {
     KAKAO_REDIRECT_URI     = "https://farmily.info/oauth/kakao"
     PORTONE_IMP_CODE       = lookup(local.extra_env, "PORTONE_IMP_CODE", "")
     PORTONE_TEST_MODE      = "false"
+
+    # AgentCore(farmily-app-ai)용 — DB 접속정보(별도 키 이름)·템플릿 버킷.
+    # public 레포 노출 방지 위해 시크릿 경유. DB_PASSWORD는 farmily/prod/app(수동)에서 ESO 병합.
+    DB_HOST         = module.rds.address
+    DB_PORT         = "5432"
+    DB_NAME         = var.db_name
+    DB_USER         = var.db_username
+    TEMPLATE_BUCKET = module.s3_templates.bucket_id
   })
 }
 output "app_role_arn" { value = aws_iam_role.app.arn }
