@@ -1,0 +1,12 @@
+apiVersion: elbv2.k8s.aws/v1beta1
+kind: TargetGroupBinding
+metadata:
+  name: farmily-app
+  namespace: farmily-prod
+spec:
+  serviceRef: { name: farmily-app, port: 8080 }
+  # TODO(apply 후): prod-eks-tg 의 ARN 으로 교체.
+  #   aws elbv2 describe-target-groups --names prod-eks-tg --query 'TargetGroups[0].TargetGroupArn' --output text
+  #   또는 terraform output (module.ecs 의 eks_target_group_arn).
+  targetGroupARN: __PROD_EKS_TG_ARN__
+  targetType: ip

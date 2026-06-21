@@ -6,6 +6,14 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.30"
+    }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.17"
+    }
   }
 }
 
@@ -31,6 +39,9 @@ module "acm_alb" {
 
   domain_name = var.api_domain
   zone_id     = data.aws_route53_zone.main.zone_id
+  # TODO(직접) ③ — ECS 전용 호스트를 인증서 SAN 에 추가(module.ecs.ecs_only_host 와 동일 값).
+  #   dev 예: subject_alternative_names = ["ecs.dev.farmily.info"]
+  subject_alternative_names = ["ecs.farmily.info"]
 }
 
 # CloudFront(정적 웹)용 인증서 - us-east-1
@@ -96,7 +107,8 @@ module "sg" {
   vpc_id                = module.vpc.vpc_id
   enable_lambda_sg      = true
   enable_noti_lambda_sg = true
-  agentcore_sg_id       = aws_security_group.agentcore.id # AgentCore->RDS(5432) 인바운드 추가
+  agentcore_sg_id       = aws_security_group.agentcore.id      # AgentCore->RDS(5432) 인바운드 추가
+  eks_cluster_sg_id     = module.eks.cluster_security_group_id # EKS 파드 -> RDS/Redis 인바운드 허용(추가만)
 }
 
 # AgentCore 서비스 SG — 콘솔로 먼저 생성(sg-02e5f7d4280c8b580)한 것을 terraform import 로 흡수.
@@ -156,6 +168,14 @@ module "ecs" {
   s3_bucket_arn             = module.s3.bucket_arn
   enable_bedrock            = var.ai_provider == "bedrock"
   enable_container_insights = true
+
+  # 블루그린 토대: prod-eks-tg + ecs_only 리스너 룰 생성. 리스너 가중 라우팅은
+  # modules/ecs/main.tf:214 의 ignore_changes=[default_action] 때문에 Terraform 이 안 건드림
+  # → 트래픽 100% ECS 유지(라이브 무영향). EKS TG weight-0 등록은 콘솔/CLI 로 수동.
+  enable_eks_bluegreen = true
+  # TODO(직접) ③ — ECS 전용 탈출 호스트. dev = "ecs.dev.farmily.info".
+  #   prod 는 새 호스트(예: "ecs.farmily.info")로 정하고, 아래 acm_alb SAN + route53 에도 같은 값 추가.
+  ecs_only_host = "ecs.farmily.info" # TODO(직접): 예 "ecs.farmily.info"
 }
 
 module "rds" {
@@ -227,9 +247,11 @@ module "route53" {
   zone_id = data.aws_route53_zone.main.zone_id
 
   # 앱/API -> ALB 직접
-  alb_dns_name     = module.ecs.alb_dns_name
-  alb_zone_id      = module.ecs.alb_zone_id
-  alb_record_names = [var.api_domain]
+  alb_dns_name = module.ecs.alb_dns_name
+  alb_zone_id  = module.ecs.alb_zone_id
+  # TODO(직접) ③ — ECS 전용 호스트 A레코드 추가(ALB 가리킴). module.ecs.ecs_only_host 와 동일 값.
+  #   예: alb_record_names = [var.api_domain, "ecs.farmily.info"]
+  alb_record_names = [var.api_domain, "ecs.farmily.info"]
 
   # 정적 웹 -> CloudFront
   cloudfront_domain_name  = module.cloudfront.distribution_domain_name
@@ -336,5 +358,22 @@ resource "aws_s3_bucket_policy" "images_oac" {
       }
     }]
   })
+}
+
+# EKS — ECS 옆에 세우는 블루그린 토대 (prod). 트래픽은 100% ECS 유지, EKS는 0%.
+# 컨트롤플레인 ENI는 private+public 서브넷, 노드는 private 서브넷에만.
+module "eks" {
+  source = "../../modules/eks"
+
+  env                = "prod"
+  region             = var.region
+  vpc_id             = module.vpc.vpc_id
+  private_subnet_ids = [module.vpc.private_subnet_a_id, module.vpc.private_subnet_c_id]
+  public_subnet_ids  = [module.vpc.public_subnet_a_id, module.vpc.public_subnet_c_id]
+
+  cluster_version = "1.35"
+
+  node_instance_types = ["t3.medium"]
+  node_desired_size   = 2
 }
 
