@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: farmily-app-ai
+  namespace: farmily-prod
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::851957594139:role/prod-eks-agentcore-role
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: farmily-app-ai
+  namespace: farmily-prod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: farmily-app-ai
+  template:
+    metadata:
+      labels:
+        app: farmily-app-ai
+    spec:
+      serviceAccountName: farmily-app-ai
+      containers:
+        - name: farmily-app-ai
+          image: 851957594139.dkr.ecr.ap-northeast-2.amazonaws.com/farmily-agentcore:prod-4d3b3871fa92e9e1af86e15e8ed25c2a7d376751
+          ports:
+            - containerPort: 8080
+          env:
+            # 비밀 아닌 운영 설정 (IAM/SG로 막혀 평문 OK)
+            - { name: MODEL_ID,             value: "apac.anthropic.claude-3-5-sonnet-20241022-v2:0" }
+            - { name: AWS_REGION,           value: "ap-northeast-2" }
+            - { name: GUARDRAIL_ID,         value: "pbebv1rby749" }
+            - { name: GUARDRAIL_VERSION,    value: "1" }
+            - { name: CARD_RENDERER_LAMBDA, value: "farmily-card-renderer" }
+            - { name: SELECT_PHOTO_LAMBDA,  value: "farmily-select-photo" }
+            # 버킷명 + DB 접속정보 — public 노출 방지 위해 app-secrets(시크릿) 경유
+            - { name: S3_BUCKET,       valueFrom: { secretKeyRef: { name: app-secrets, key: S3_BUCKET } } }
+            - { name: TEMPLATE_BUCKET, valueFrom: { secretKeyRef: { name: app-secrets, key: TEMPLATE_BUCKET } } }
+            - { name: DB_HOST,         valueFrom: { secretKeyRef: { name: app-secrets, key: DB_HOST } } }
+            - { name: DB_PORT,         valueFrom: { secretKeyRef: { name: app-secrets, key: DB_PORT } } }
+            - { name: DB_NAME,         valueFrom: { secretKeyRef: { name: app-secrets, key: DB_NAME } } }
+            - { name: DB_USER,         valueFrom: { secretKeyRef: { name: app-secrets, key: DB_USER } } }
+            - { name: DB_PASSWORD,     valueFrom: { secretKeyRef: { name: app-secrets, key: DB_PASSWORD } } }
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: 8080
+            initialDelaySeconds: 90
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: farmily-app-ai
+  namespace: farmily-prod
+spec:
+  selector:
+    app: farmily-app-ai
+  ports: [ { port: 8080, targetPort: 8080 } ]
