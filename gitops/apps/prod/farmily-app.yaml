@@ -34,6 +34,7 @@ spec:
             - { name: APP_VARIANT, value: "eks" }          # ★ 버전 마커(ECS vs EKS 식별)
             - { name: S3_REGION, value: "ap-northeast-2" }
             - { name: AGENTCORE_URL, value: "http://farmily-app-ai:8080" }
+            - { name: AUTH_DEV_MASTER_ENABLED, value: "true"}
           envFrom:
             - secretRef:
                 name: app-secrets   # ESO 가 farmily/prod/app + app-infra 병합 생성
