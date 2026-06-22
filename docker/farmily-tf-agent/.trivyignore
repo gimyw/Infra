@@ -1,0 +1,96 @@
+# ──────────────────────────────────────────────
+# Debian 12 OS packages — no fix available
+# ──────────────────────────────────────────────
+
+# zlib1g (will_not_fix — Debian maintainer 수정 안 함)
+CVE-2023-45853
+
+# libexpat1 (will_not_fix / affected)
+CVE-2025-59375
+CVE-2026-25210
+CVE-2026-45186
+
+# curl / libcurl (affected)
+CVE-2026-5773
+CVE-2026-6276
+
+# jq / libjq1 (affected)
+CVE-2026-32316
+CVE-2026-40164
+
+# libldap (affected)
+CVE-2023-2953
+
+# ncurses (affected)
+CVE-2025-69720
+
+# libssh2 (affected)
+CVE-2026-7598
+
+# libsqlite3 (affected / fix_deferred)
+CVE-2025-7458
+CVE-2026-11822
+CVE-2026-11824
+
+# perl (affected / fix_deferred)
+CVE-2026-42496
+CVE-2026-42497
+CVE-2026-9538
+CVE-2026-8376
+CVE-2026-48962
+
+# python3.11 OS package (affected — checkov venv과 별개, OS python은 미사용)
+CVE-2025-69534
+CVE-2026-3644
+CVE-2026-4224
+CVE-2026-6100
+CVE-2026-7210
+
+# ──────────────────────────────────────────────
+# terraform 1.9.6 / tflint 0.51.1 내부 Go 의존성
+# 현재 버전(1.9.6)에 핀 중 — 버전 업 시 재스캔 후 해소
+# ──────────────────────────────────────────────
+
+# golang.org/x/crypto
+CVE-2024-45337
+CVE-2025-22869
+
+# golang.org/x/oauth2
+CVE-2025-22868
+
+# golang-jwt
+CVE-2025-30204
+
+# go-getter
+CVE-2024-6257
+CVE-2025-8959
+CVE-2026-4660
+
+# go-slug
+CVE-2025-0377
+
+# opentelemetry
+CVE-2026-24051
+CVE-2026-39883
+
+# grpc
+CVE-2026-33186
+
+# Go stdlib
+CVE-2024-24790
+CVE-2024-34156
+CVE-2025-61726
+CVE-2025-61729
+CVE-2025-68121
+CVE-2026-25679
+CVE-2026-32280
+CVE-2026-32281
+CVE-2026-32283
+CVE-2026-33811
+CVE-2026-33814
+CVE-2026-39820
+CVE-2026-39823
+CVE-2026-39825
+CVE-2026-39836
+CVE-2026-42499
+CVE-2026-42504
