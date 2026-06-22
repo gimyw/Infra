@@ -35,6 +35,7 @@ spec:
             - { name: S3_REGION, value: "ap-northeast-2" }
             - { name: AGENTCORE_URL, value: "http://farmily-app-ai:8080" }
             - { name: AUTH_DEV_MASTER_ENABLED, value: "true"}
+            - { name: AI_PROVIDER,   value: "agentcore"}
           envFrom:
             - secretRef:
                 name: app-secrets   # ESO 가 farmily/prod/app + app-infra 병합 생성
