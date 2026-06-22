@@ -1,0 +1,47 @@
+#AWS에서 AMI, 역할, 서브넷/SG를 찾는 법
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: default
+spec:
+  # 1-1에서 만든 EC2 생성 Role 
+  role: prod-eks-karpenter-node-role
+  amiSelectorTerms:
+  # 아마존 리눅스 최신 버전
+    - alias: al2023@latest
+  securityGroupSelectorTerms:
+    - tags: {karpenter.sh/discovery: prod-eks}
+  # 1-4 태그로 발견한다.
+  subnetSelectorTerms:
+    - tags: {karpenter.sh/discovery: prod-eks}
+---
+# NodePool 어떤 스펙의 노드를 얼마나 띄울까
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: default
+spec:
+  template:
+    spec: 
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: default
+      requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["on-demand", "spot"] #On-Demend + Spot 혼합
+        - key: karpenter.k8s.aws/instance-category
+          operator: In
+          values: ["t", "m", "c"] # 범용 컴퓨트 계열 허용
+        - key: karpenter.k8s.aws/instance-cpu
+          operator: In
+          values: ["2","4"] # 2~4 vCPU 인스턴스로 제한한다.
+  disruption:
+    consolidationPolicy: WhenEmptyOrUnderutilized # 비거나 놀면 정리한다.
+    consolidateAfter: 1m
+  limits:
+    cpu: "20" # 이 NodePoll이 띄울 수 있는 vCPU 총합 상한 (폭주를 방지한다.)
