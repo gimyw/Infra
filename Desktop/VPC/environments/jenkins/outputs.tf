@@ -17,3 +17,13 @@ output "tf_runner_prod_arn" {
   description = "Jenkinsfile ROLE_ARN (prod) — main.tf ROLE_ARN 변수와 일치 확인용"
   value       = aws_iam_role.tf_runner_prod.arn
 }
+
+output "jenkins_instance_id" {
+  description = "Jenkins EC2 인스턴스 ID"
+  value       = aws_instance.jenkins.id
+}
+
+output "jenkins_private_ip" {
+  description = "Jenkins EC2 프라이빗 IP (VPN 연결 후 http://<IP>:8080 접속)"
+  value       = aws_instance.jenkins.private_ip
+}
