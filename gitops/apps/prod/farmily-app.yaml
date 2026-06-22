@@ -26,7 +26,7 @@ spec:
         - name: farmily-app
           # prod ECR 이미지 — 불변 SHA 태그로 핀(롤백 추적·재시작 시 버전 고정). latest 금지.
           # 새 배포 = 이 태그를 새 prod-<sha>로 갱신(이상적으로 CI/CD가 자동 커밋).
-          image: 851957594139.dkr.ecr.ap-northeast-2.amazonaws.com/farmily-api:prod-7f6e3d9
+          image: 851957594139.dkr.ecr.ap-northeast-2.amazonaws.com/farmily-api:prod-d7b6cd9
           ports:
             - containerPort: 8080
           env:
