@@ -13,6 +13,9 @@ resource "aws_elasticache_replication_group" "main" {
   subnet_group_name    = aws_elasticache_subnet_group.main.name
   security_group_ids   = var.security_group_ids
   automatic_failover_enabled = var.num_cache_clusters > 1
+  transit_encryption_enabled = var.transit_encryption_enabled
+  transit_encryption_mode    = var.transit_encryption_enabled ? var.transit_encryption_mode : null
+  apply_immediately          = true
 
   tags = { Name = "${var.env}-redis" }
 }

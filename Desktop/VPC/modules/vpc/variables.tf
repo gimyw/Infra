@@ -27,6 +27,18 @@ variable "private_subnet_c_cidr" {
   type = string
 }
 
+variable "private_db_subnet_a_cidr" {
+  type    = string
+  default = ""
+  description = "DB tier private subnet AZ-a CIDR. Empty = not created."
+}
+
+variable "private_db_subnet_c_cidr" {
+  type    = string
+  default = ""
+  description = "DB tier private subnet AZ-c CIDR. Empty = not created."
+}
+
 variable "enable_multi_nat" {
   type    = bool
   default = false

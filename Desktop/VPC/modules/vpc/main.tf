@@ -46,6 +46,37 @@ resource "aws_internet_gateway" "main" {
   tags = { Name = "${var.env}-igw" }
 }
 
+# DB tier private subnets (optional)
+resource "aws_subnet" "private_db_a" {
+  count             = var.private_db_subnet_a_cidr != "" ? 1 : 0
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = var.private_db_subnet_a_cidr
+  availability_zone = "${var.region}a"
+
+  tags = { Name = "${var.env}-private-db-subnet-a" }
+}
+
+resource "aws_subnet" "private_db_c" {
+  count             = var.private_db_subnet_c_cidr != "" ? 1 : 0
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = var.private_db_subnet_c_cidr
+  availability_zone = "${var.region}c"
+
+  tags = { Name = "${var.env}-private-db-subnet-c" }
+}
+
+resource "aws_route_table_association" "private_db_a" {
+  count          = var.private_db_subnet_a_cidr != "" ? 1 : 0
+  subnet_id      = aws_subnet.private_db_a[0].id
+  route_table_id = aws_route_table.private_a.id
+}
+
+resource "aws_route_table_association" "private_db_c" {
+  count          = var.private_db_subnet_c_cidr != "" ? 1 : 0
+  subnet_id      = aws_subnet.private_db_c[0].id
+  route_table_id = aws_route_table.private_c.id
+}
+
 # NAT Gateway(s)
 resource "aws_eip" "nat_a" {
   domain = "vpc"

@@ -202,6 +202,8 @@ module "elasticache" {
   security_group_ids = [module.sg.redis_sg_id]
   node_type          = "cache.t3.small"
   num_cache_clusters = 2
+  transit_encryption_enabled = true
+  transit_encryption_mode    = "required"
 }
 
 # 업로드 전용 버킷 (앱 presigned, CORS 필요 - 디지털명함/Expo 웹이 이미지 직접 GET/PUT)
@@ -211,6 +213,75 @@ module "s3" {
   env                  = "prod"
   bucket_name          = var.s3_bucket_name
   cors_allowed_origins = ["http://localhost:3000", "https://farmily.info", "https://www.farmily.info"]
+}
+
+# S3 CRR: farmily-s3-bucket → 도쿄 복제
+resource "aws_iam_role" "s3_replication" {
+  name = "prod-s3-replication-role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "s3.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "s3_replication" {
+  name = "prod-s3-replication-policy"
+  role = aws_iam_role.s3_replication.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["s3:GetReplicationConfiguration", "s3:ListBucket"]
+        Resource = [module.s3.bucket_arn]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["s3:GetObjectVersionForReplication", "s3:GetObjectVersionAcl", "s3:GetObjectVersionTagging"]
+        Resource = ["${module.s3.bucket_arn}/*"]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["s3:ReplicateObject", "s3:ReplicateDelete", "s3:ReplicateTags"]
+        Resource = ["arn:aws:s3:::farmily-s3-bucket-dr/*"]
+      }
+    ]
+  })
+}
+
+resource "aws_s3_bucket_replication_configuration" "images_crr" {
+  bucket = module.s3.bucket_id
+  role   = aws_iam_role.s3_replication.arn
+
+  rule {
+    id     = "dr-replication"
+    status = "Enabled"
+
+    destination {
+      bucket        = "arn:aws:s3:::farmily-s3-bucket-dr"
+      storage_class = "STANDARD"
+    }
+  }
+}
+
+# ECR Replication: farmily-api → 도쿄 자동 복제
+resource "aws_ecr_replication_configuration" "dr" {
+  replication_configuration {
+    rule {
+      destination {
+        region      = "ap-northeast-1"
+        registry_id = "851957594139"
+      }
+      repository_filter {
+        filter      = "farmily"
+        filter_type = "PREFIX_MATCH"
+      }
+    }
+  }
 }
 
 # 프론트(디지털명함) 정적 웹 전용 버킷 (CloudFront 오리진, CORS 불필요)
@@ -246,16 +317,85 @@ module "route53" {
 
   zone_id = data.aws_route53_zone.main.zone_id
 
-  # 앱/API -> ALB 직접
+  # 앱/API -> ALB 직접 (api.farmily.info는 Failover로 분리)
   alb_dns_name = module.ecs.alb_dns_name
   alb_zone_id  = module.ecs.alb_zone_id
-  # TODO(직접) ③ — ECS 전용 호스트 A레코드 추가(ALB 가리킴). module.ecs.ecs_only_host 와 동일 값.
-  #   예: alb_record_names = [var.api_domain, "ecs.farmily.info"]
-  alb_record_names = [var.api_domain, "ecs.farmily.info"]
+  alb_record_names = ["ecs.farmily.info"]
 
   # 정적 웹 -> CloudFront
   cloudfront_domain_name  = module.cloudfront.distribution_domain_name
   cloudfront_record_names = concat([var.web_domain], var.web_domain_aliases)
+}
+
+# ==============================================================================
+# Route 53 Failover (api.farmily.info)
+# ==============================================================================
+resource "aws_route53_health_check" "seoul_alb" {
+  fqdn              = "api.farmily.info"
+  port              = 443
+  type              = "HTTPS"
+  resource_path     = "/api/v1/health"
+  failure_threshold = 3
+  request_interval  = 10
+
+  tags = { Name = "seoul-alb-health" }
+}
+
+resource "aws_route53_record" "api_primary" {
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = "api.farmily.info"
+  type    = "A"
+
+  set_identifier = "primary-seoul"
+  failover_routing_policy { type = "PRIMARY" }
+  health_check_id = aws_route53_health_check.seoul_alb.id
+
+  alias {
+    name                   = module.ecs.alb_dns_name
+    zone_id                = module.ecs.alb_zone_id
+    evaluate_target_health = true
+  }
+}
+
+resource "aws_route53_record" "api_secondary" {
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = "api.farmily.info"
+  type    = "A"
+
+  set_identifier = "secondary-tokyo"
+  failover_routing_policy { type = "SECONDARY" }
+
+  alias {
+    name                   = "dr-alb-489281855.ap-northeast-1.elb.amazonaws.com"
+    zone_id                = "Z14GRHDCWA56QT"  # ap-northeast-1 ALB hosted zone ID
+    evaluate_target_health = true
+  }
+}
+
+# ==============================================================================
+# DR Failover Alert (CloudWatch + SNS)
+# ==============================================================================
+resource "aws_sns_topic" "dr_alerts" {
+  name = "dr-failover-alerts"
+}
+
+resource "aws_cloudwatch_metric_alarm" "dr_health_check" {
+  alarm_name          = "dr-seoul-health-check-failed"
+  comparison_operator = "LessThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "HealthCheckStatus"
+  namespace           = "AWS/Route53"
+  period              = 60
+  statistic           = "Minimum"
+  threshold           = 1
+  alarm_description   = "Seoul ALB health check failed - potential region failure"
+
+  dimensions = {
+    HealthCheckId = aws_route53_health_check.seoul_alb.id
+  }
+
+  alarm_actions = [aws_sns_topic.dr_alerts.arn]
+  ok_actions    = [aws_sns_topic.dr_alerts.arn]
 }
 
 module "cloudwatch" {

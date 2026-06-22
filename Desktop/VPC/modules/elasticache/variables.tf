@@ -24,3 +24,13 @@ variable "engine_version" {
   type    = string
   default = "7.0"
 }
+
+variable "transit_encryption_enabled" {
+  type    = bool
+  default = false
+}
+
+variable "transit_encryption_mode" {
+  type    = string
+  default = "preferred"
+}
