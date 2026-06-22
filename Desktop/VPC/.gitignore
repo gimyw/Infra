@@ -12,3 +12,9 @@
 # Lambda 빌드 산출물 (archive_file 이 재생성)
 modules/ecs-scheduler/lambda/*.zip
 *.plan
+
+# 인증서 / 키 (루트 .gitignore 보강)
+*.pem
+*.key
+*.crt
+.env

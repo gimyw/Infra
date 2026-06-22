@@ -10,6 +10,16 @@ override.tf.json
 crash.log
 crash.*.log
 
-# 로컬 시크릿
+# 로컬 시크릿 / 인증서 키
 *.pem
+*.key
+*.crt
 .env
+
+# Terraform plan (plan 출력에 시크릿 평문 포함 가능)
+*.plan
+*.tfplan
+
+# Terraform 변수 (시크릿 포함 가능)
+*.tfvars
+!*.tfvars.example
