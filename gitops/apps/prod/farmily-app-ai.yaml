@@ -27,6 +27,13 @@ spec:
           image: 851957594139.dkr.ecr.ap-northeast-2.amazonaws.com/farmily-agentcore:prod-4d3b3871fa92e9e1af86e15e8ed25c2a7d376751
           ports:
             - containerPort: 8080
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "1"
+              memory: 2Gi
           env:
             # 비밀 아닌 운영 설정 (IAM/SG로 막혀 평문 OK)
             - { name: MODEL_ID,             value: "apac.anthropic.claude-3-5-sonnet-20241022-v2:0" }
