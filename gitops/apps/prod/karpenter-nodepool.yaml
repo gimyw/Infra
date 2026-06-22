@@ -3,6 +3,9 @@ apiVersion: karpenter.k8s.aws/v1
 kind: EC2NodeClass
 metadata:
   name: default
+  annotations:
+    # CRD(karpenter)가 차트보다 늦게 깔려도 dry-run으로 sync 전체가 막히지 않게 (§8 데드락 회피)
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   # 1-1에서 만든 EC2 생성 Role 
   role: prod-eks-karpenter-node-role
@@ -20,6 +23,8 @@ apiVersion: karpenter.sh/v1
 kind: NodePool
 metadata:
   name: default
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   template:
     spec: 

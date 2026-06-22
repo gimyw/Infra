@@ -3,6 +3,9 @@ kind: TriggerAuthentication
 metadata:
   name: keda-pg-auth
   namespace: farmily-prod
+  annotations:
+    # KEDA CRD가 차트보다 늦게 깔려도 dry-run으로 전체 sync가 막히지 않게 (§8 데드락 회피)
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   secretTargetRef:
     - { parameter: connection, name: keda-pg-secret, key: connection}
@@ -12,6 +15,8 @@ kind: ScaledObject
 metadata:
   name: farmily-app-ai
   namespace: farmily-prod
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   scaleTargetRef:
     name: farmily-app-ai # 이 디플로이먼트에서
