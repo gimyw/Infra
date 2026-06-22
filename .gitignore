@@ -1,0 +1,15 @@
+# macOS
+.DS_Store
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+override.tf
+override.tf.json
+crash.log
+crash.*.log
+
+# 로컬 시크릿
+*.pem
+.env
