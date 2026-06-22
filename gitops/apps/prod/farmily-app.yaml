@@ -12,7 +12,7 @@ metadata:
   name: farmily-app
   namespace: farmily-prod
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: farmily-app
@@ -26,15 +26,23 @@ spec:
         - name: farmily-app
           # prod ECR 이미지 — 불변 SHA 태그로 핀(롤백 추적·재시작 시 버전 고정). latest 금지.
           # 새 배포 = 이 태그를 새 prod-<sha>로 갱신(이상적으로 CI/CD가 자동 커밋).
-          image: 851957594139.dkr.ecr.ap-northeast-2.amazonaws.com/farmily-api:prod-7f6e3d9
+          image: 851957594139.dkr.ecr.ap-northeast-2.amazonaws.com/farmily-api:prod-d7b6cd9
           ports:
             - containerPort: 8080
+          resources:
+            requests:
+              cpu: 250m #0.25v CPU 
+              memory: 512Mi
+            limits:
+              cpu: "1" # 최대 1 CPU 까지 허용 가능
+              memory: 1Gi # 1 CPU 1G로 잡은 이유는 스프링 백엔드가 무거움
           env:
             - { name: SPRING_PROFILES_ACTIVE, value: "prod" }
             - { name: APP_VARIANT, value: "eks" }          # ★ 버전 마커(ECS vs EKS 식별)
             - { name: S3_REGION, value: "ap-northeast-2" }
             - { name: AGENTCORE_URL, value: "http://farmily-app-ai:8080" }
             - { name: AUTH_DEV_MASTER_ENABLED, value: "true"}
+            - { name: AI_PROVIDER,   value: "agentcore"}
           envFrom:
             - secretRef:
                 name: app-secrets   # ESO 가 farmily/prod/app + app-infra 병합 생성

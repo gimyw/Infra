@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: metrics-server
+  namespace: argocd 
+spec:
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  project: default
+  source:
+    repoURL: https://kubernetes-sigs.github.io/metrics-server  
+    chart: metrics-server
+    targetRevision: 3.12.2
+    helm: 
+      values: | 
+        args:
+          - --kubelet-insecure-tls # EKS에서 kubelet 인증서 문제 회피 (표준 권장)
+        resources:
+          requests: { cpu: 50m, memory: 64Mi }
+          limits: { cpu: 100m, memory: 128Mi }
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
