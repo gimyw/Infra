@@ -1,0 +1,6 @@
+# VPN 인증서 — 절대 커밋 금지
+*.key
+*.crt
+*.pem
+*.csr
+*.srl
