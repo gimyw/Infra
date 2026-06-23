@@ -28,6 +28,27 @@ provider "helm" {
     }
   }
 }
+# jenkins-tf-runner-prod가 EKS Helm/Kubernetes provider로 plan/apply하려면
+# EKS access entry에 등록되어야 한다. (IAM 토큰은 발급되지만 K8s RBAC 인증 실패 방지)
+# 최초 1회 수동 부트스트랩 후 import 필요 — 닭-달걀 문제
+resource "aws_eks_access_entry" "jenkins_tf_runner" {
+  cluster_name  = module.eks.cluster_name
+  principal_arn = "arn:aws:iam::851957594139:role/farmily/irsa/jenkins-tf-runner-prod"
+  type          = "STANDARD"
+}
+
+resource "aws_eks_access_policy_association" "jenkins_tf_runner" {
+  cluster_name  = module.eks.cluster_name
+  principal_arn = "arn:aws:iam::851957594139:role/farmily/irsa/jenkins-tf-runner-prod"
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+
+  access_scope {
+    type = "cluster"
+  }
+
+  depends_on = [aws_eks_access_entry.jenkins_tf_runner]
+}
+
 resource "helm_release" "argocd" {
   name             = "argocd"
   repository       = "https://argoproj.github.io/argo-helm"
