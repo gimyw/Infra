@@ -4,16 +4,16 @@
 # 연결 후 접근 가능: Jenkins EC2(8080), Grafana(EKS 전환 후), dev RDS/Redis
 #
 # 인증서 ARN: ACM에 수동 업로드 완료 (vpn-certs/ 디렉토리, git 제외)
-# 서버: arn:aws:acm:ap-northeast-2:851957594139:certificate/ab9392dc-5824-4829-b1a2-b00ad6b4a081 (CN=vpn.farmily.internal)
-# 클라이언트: arn:aws:acm:ap-northeast-2:851957594139:certificate/ec30b62c-e13d-4691-9348-1822548900a7
+# 서버: arn:aws:acm:ap-northeast-2:851957594139:certificate/e285d384-b788-4a8a-b33d-d356b985e806 (Key Usage + EKU 포함)
+# 클라이언트: arn:aws:acm:ap-northeast-2:851957594139:certificate/3643b889-ed8e-4a0f-b646-7da26504c728
 
 locals {
   dev_vpc_id         = "vpc-0bbc10947088b1d1c"
   dev_private_subnet = "subnet-04bde333b9e019d43"   # dev-private-subnet-a (ap-northeast-2a)
   vpn_cidr           = "10.2.0.0/22"                # dev VPC(10.0.0.0/16)와 겹치지 않는 클라이언트 IP 대역
 
-  server_cert_arn = "arn:aws:acm:ap-northeast-2:851957594139:certificate/ab9392dc-5824-4829-b1a2-b00ad6b4a081"
-  client_cert_arn = "arn:aws:acm:ap-northeast-2:851957594139:certificate/ec30b62c-e13d-4691-9348-1822548900a7"
+  server_cert_arn = "arn:aws:acm:ap-northeast-2:851957594139:certificate/e285d384-b788-4a8a-b33d-d356b985e806"
+  client_cert_arn = "arn:aws:acm:ap-northeast-2:851957594139:certificate/3643b889-ed8e-4a0f-b646-7da26504c728"
 }
 
 # ────────────────────────────────────────────────────────────────

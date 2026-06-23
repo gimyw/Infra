@@ -24,6 +24,7 @@ resource "aws_instance" "jenkins" {
 
   vpc_security_group_ids = [aws_security_group.jenkins.id]
   iam_instance_profile   = aws_iam_instance_profile.jenkins_ec2.name
+  private_ip             = "10.0.10.250"
 
   key_name = var.jenkins_key_name != "" ? var.jenkins_key_name : null
 
