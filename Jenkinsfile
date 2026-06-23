@@ -212,25 +212,21 @@ pipeline {
     success {
       script {
         if (env.TF_HAS_CHANGES == 'true' && !env.CHANGE_ID) {
-          try {
-            slackSend(
-              channel: '#farmily-infra',
-              color: 'good',
-              message: "[Infra/${ENV}] terraform apply 완료\n${env.JOB_NAME} #${env.BUILD_NUMBER}\n<${env.BUILD_URL}|빌드 로그>"
-            )
-          } catch (e) { echo "Slack 알림 실패(토큰 미설정): ${e.message}" }
+          withCredentials([string(credentialsId: 'slack-infra-webhook', variable: 'SLACK_URL')]) {
+            sh """curl -s -X POST "\$SLACK_URL" \
+              -H 'Content-type: application/json' \
+              -d '{"text":"[Infra/${ENV}] terraform apply 완료\\n${env.JOB_NAME} #${env.BUILD_NUMBER} <${env.BUILD_URL}|빌드 로그>"}'"""
+          }
         }
       }
     }
     failure {
       script {
-        try {
-          slackSend(
-            channel: '#farmily-infra',
-            color: 'danger',
-            message: "[Infra/${ENV}] 파이프라인 실패 (가드 차단 가능)\n${env.JOB_NAME} #${env.BUILD_NUMBER}\n<${env.BUILD_URL}|로그 확인>"
-          )
-        } catch (e) { echo "Slack 알림 실패(토큰 미설정): ${e.message}" }
+        withCredentials([string(credentialsId: 'slack-infra-webhook', variable: 'SLACK_URL')]) {
+          sh """curl -s -X POST "\$SLACK_URL" \
+            -H 'Content-type: application/json' \
+            -d '{"text":"[Infra/${ENV}] 파이프라인 실패\\n${env.JOB_NAME} #${env.BUILD_NUMBER} <${env.BUILD_URL}|로그 확인>"}'"""
+        }
       }
     }
     always {
