@@ -1,0 +1,82 @@
+# checkov skip 목록 — prod 동일 기준 + dev 추가 항목
+# 1) false_positive: checkov가 cross-resource 참조를 못 보는 구조적 한계
+# 2) intentional: 의도적 설계 결정 (트레이드오프 인지하고 수용)
+# 3) deferred: 실제 보안 개선 필요하지만 별도 작업으로 분리
+
+skip-check:
+  # ── false_positive ──────────────────────────────────────────────────────────
+  - CKV2_AWS_5    # SG not attached: checkov가 모듈 간 sg_id 참조를 추적 못함
+  - CKV2_AWS_19   # EIP not attached: NAT Gateway에 정상 연결됨
+  - CKV2_AWS_23   # Route53 A record: ALB alias 레코드, checkov가 alias 미인식
+
+  # ── intentional ─────────────────────────────────────────────────────────────
+  - CKV_AWS_39    # EKS public endpoint disabled: Jenkins·VPN에서 kubectl 접근 필요
+  - CKV_AWS_38    # EKS public endpoint 0.0.0.0/0: VPN IP 제한은 추후 적용 예정
+  - CKV_AWS_130   # VPC subnet auto-assign public IP: 퍼블릭 서브넷은 설계상 필요
+  - CKV_AWS_2     # ALB HTTP listener: 80→443 리다이렉트 전용
+  - CKV_AWS_260   # SG port 80 from 0.0.0.0/0: ALB 80→443 리다이렉트 전용
+  - CKV2_AWS_28   # ALB WAF: WAF 연결됨, checkov 미인식
+  - CKV_AWS_355   # IAM resource *: Bedrock·ECS API는 ARN 지정 불가
+  - CKV_AWS_290   # IAM write *: ECS API ARN 지정 불가 (AWS 정책 제약)
+
+  # ── Lambda / EventBridge (dev only) ─────────────────────────────────────────
+  - CKV_AWS_272   # Lambda code signing: ECS 스케줄러, 내부 단순 Lambda
+  - CKV_AWS_116   # Lambda DLQ: 스케줄러, 이벤트 유실 허용 설계
+  - CKV_AWS_173   # Lambda env encryption: env에 시크릿 없음(SSM/SM 사용)
+  - CKV_AWS_115   # Lambda concurrent limit: 스케줄러, 동시 실행 1회만 필요
+  - CKV_AWS_117   # Lambda VPC: ECS API 호출 전용, VPC 불필요
+  - CKV_AWS_50    # Lambda X-Ray: 모니터링 고도화 단계에서 활성화 예정
+  - CKV_AWS_297   # EventBridge Scheduler CMK: KMS 키 설계 후 적용
+
+  # ── deferred ────────────────────────────────────────────────────────────────
+  # RDS
+  - CKV_AWS_16    # RDS storage_encrypted: 마이그레이션 계획 후 적용
+  - CKV_AWS_129   # RDS logs enabled: 별도 작업으로 활성화 예정
+  - CKV_AWS_226   # RDS auto minor upgrade: 점검 시간 확보 후 활성화
+  - CKV_AWS_161   # RDS IAM auth: 앱 코드 변경 동반, Backend 팀 협의 필요
+  - CKV_AWS_293   # RDS deletion protection: 운영 안정화 후 활성화
+  - CKV_AWS_354   # RDS Performance Insights KMS CMK: KMS 키 설계 후 적용
+  - CKV_AWS_353   # RDS Performance Insights: 모니터링 고도화 단계에서 활성화
+  - CKV_AWS_157   # RDS Multi-AZ replica: 레플리카는 단일 AZ가 설계 의도
+  - CKV2_AWS_30   # Postgres query logging: RDS 파라미터 그룹 수정 필요
+  - CKV2_AWS_60   # RDS copy tags to snapshots: 태그 정책 정립 후 적용
+
+  # ElastiCache
+  - CKV_AWS_29    # ElastiCache at-rest encryption: 클러스터 교체 필요
+  - CKV_AWS_30    # ElastiCache at-transit encryption: 앱 Redis 클라이언트 설정 변경 동반
+  - CKV_AWS_31    # ElastiCache auth token: 앱 Redis 클라이언트 설정 변경 동반
+  - CKV_AWS_191   # ElastiCache KMS CMK: KMS 키 설계 후 적용
+  - CKV2_AWS_50   # ElastiCache Multi-AZ: 비용 검토 후 활성화
+
+  # EKS
+  - CKV_AWS_58    # EKS Secrets encryption: KMS + envelope encryption 설정 필요
+  - CKV_AWS_37    # EKS control plane logging: 별도 PR로 활성화 예정
+  - CKV_AWS_339   # EKS Kubernetes version: 버전 업그레이드는 별도 작업
+
+  # ALB
+  - CKV_AWS_131   # ALB drop HTTP headers: 보안 헤더 정책 정립 후 적용
+  - CKV_AWS_91    # ALB access logging: S3 로그 버킷 설계 후 활성화
+  - CKV_AWS_150   # ALB deletion protection: 운영 안정화 후 활성화
+
+  # CloudWatch / SNS
+  - CKV_AWS_158   # CloudWatch log group KMS: KMS 키 설계 후 적용
+  - CKV_AWS_338   # CloudWatch log retention 1 year: 비용 검토 후 조정
+  - CKV_AWS_26    # SNS topic encryption: KMS 키 설계 후 적용
+
+  # S3
+  - CKV_AWS_18    # S3 access logging: 로그 버킷 설계 후 활성화
+  - CKV_AWS_145   # S3 KMS CMK: 현재 SSE-S3 사용, CMK 전환 비용 검토 후
+  - CKV_AWS_144   # S3 cross-region replication: DR 범위 외
+  - CKV2_AWS_62   # S3 event notifications: 필요 시 추가
+  - CKV2_AWS_61   # S3 lifecycle: 오브젝트 수명주기 정책 수립 후 적용
+
+  # Secrets Manager
+  - CKV_AWS_149   # Secrets Manager KMS CMK: KMS 키 설계 후 적용
+  - CKV2_AWS_57   # Secrets Manager auto rotation: Lambda rotator 구성 필요
+
+  # VPC
+  - CKV2_AWS_11   # VPC flow logging: 로그 저장 버킷 설계 후 활성화
+  - CKV2_AWS_12   # VPC default SG: default SG 트래픽 제한 적용 예정
+
+  # SG
+  - CKV_AWS_23    # SG description: 인라인 description 추가 예정
