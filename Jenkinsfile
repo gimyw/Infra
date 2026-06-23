@@ -19,6 +19,9 @@ pipeline {
     ENV              = "${env.BRANCH_NAME == 'main' ? 'prod' : 'dev'}"
     TF_DIR           = "Desktop/VPC/environments/${ENV}"
     ROLE_ARN         = "arn:aws:iam::851957594139:role/farmily/irsa/jenkins-tf-runner-${ENV}"
+    HELM_CACHE_HOME  = '/tmp/helm-cache'
+    HELM_DATA_HOME   = '/tmp/helm-data'
+    HELM_CONFIG_HOME = '/tmp/helm-config'
   }
 
   stages {
