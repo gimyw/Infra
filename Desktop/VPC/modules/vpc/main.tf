@@ -30,6 +30,10 @@ resource "aws_subnet" "private_a" {
   availability_zone = "${var.region}a"
 
   tags = { Name = "${var.env}-private-subnet-a" }
+
+  lifecycle {
+    ignore_changes = [tags["karpenter.sh/discovery"]]
+  }
 }
 
 resource "aws_subnet" "private_c" {
@@ -38,6 +42,10 @@ resource "aws_subnet" "private_c" {
   availability_zone = "${var.region}c"
 
   tags = { Name = "${var.env}-private-subnet-c" }
+
+  lifecycle {
+    ignore_changes = [tags["karpenter.sh/discovery"]]
+  }
 }
 
 resource "aws_internet_gateway" "main" {

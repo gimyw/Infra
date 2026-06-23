@@ -97,6 +97,9 @@ resource "aws_secretsmanager_secret" "app_infra" {
 
 resource "aws_secretsmanager_secret_version" "app_infra" {
   secret_id = aws_secretsmanager_secret.app_infra.id
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
   secret_string = jsonencode({
     DB_URL                 = "jdbc:postgresql://${module.rds.address}:5432/${var.db_name}"
     DB_USERNAME            = var.db_username
