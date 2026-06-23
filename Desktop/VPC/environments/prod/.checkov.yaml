@@ -26,6 +26,7 @@ skip-check:
   - CKV_AWS_293   # RDS deletion protection: 운영 안정화 후 활성화
   - CKV_AWS_354   # RDS Performance Insights KMS CMK: KMS 키 설계 후 적용
   - CKV_AWS_353   # RDS Performance Insights: 모니터링 고도화 단계에서 활성화
+  - CKV_AWS_118   # RDS replica enhanced monitoring: replica는 모니터링 간격 미설정 (설계 의도)
   - CKV_AWS_157   # RDS Multi-AZ replica: 레플리카는 단일 AZ가 설계 의도
   - CKV2_AWS_30   # Postgres query logging: RDS 파라미터 그룹 수정 필요
   - CKV2_AWS_60   # RDS copy tags to snapshots: 태그 정책 정립 후 적용
@@ -42,6 +43,7 @@ skip-check:
   - CKV_AWS_339   # EKS Kubernetes version: 버전 업그레이드는 별도 작업
 
   # ALB
+  - CKV_AWS_260   # ALB SG port 80: 80→443 리다이렉트 전용 inbound, 실 트래픽 미서빙
   - CKV_AWS_131   # ALB drop HTTP headers: 보안 헤더 정책 정립 후 적용
   - CKV_AWS_91    # ALB access logging: S3 로그 버킷 설계 후 활성화
   - CKV_AWS_150   # ALB deletion protection: 운영 안정화 후 활성화
