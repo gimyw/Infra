@@ -1,9 +1,9 @@
-# Jenkins ALB — GitHub 웹훅 수신용 공개 엔드포인트
-# jenkins.farmily.info → ALB(공개) → Jenkins EC2(내부 10.0.10.250:8080)
+# Jenkins External ALB — GitHub 웹훅 수신 전용
+# jenkins.farmily.info → ALB(internet-facing, GitHub IPs only) → Jenkins EC2:8080
 
 locals {
-  dev_public_subnet_a = "subnet-0e6c50470bd82b2f0"   # dev-public-subnet-a (ap-northeast-2a)
-  dev_public_subnet_c = "subnet-0e84497444f496f84"   # dev-public-subnet-c (ap-northeast-2c)
+  dev_public_subnet_a = "subnet-0e6c50470bd82b2f0"
+  dev_public_subnet_c = "subnet-0e84497444f496f84"
 }
 
 data "aws_route53_zone" "main" {
@@ -11,7 +11,7 @@ data "aws_route53_zone" "main" {
 }
 
 # ────────────────────────────────────────────────────────────────
-# 1. ACM 인증서 (jenkins.farmily.info)
+# 1. ACM 인증서
 # ────────────────────────────────────────────────────────────────
 resource "aws_acm_certificate" "jenkins" {
   domain_name       = "jenkins.farmily.info"
@@ -46,27 +46,40 @@ resource "aws_acm_certificate_validation" "jenkins" {
 }
 
 # ────────────────────────────────────────────────────────────────
-# 2. ALB SG — 인터넷에서 80/443 허용
+# 2. External ALB SG — GitHub webhook IP만 허용
+# name_prefix 사용: create_before_destroy 시 동일 이름 충돌 방지
 # ────────────────────────────────────────────────────────────────
 resource "aws_security_group" "jenkins_alb" {
-  name        = "farmily-jenkins-alb-sg"
-  description = "Jenkins ALB - 80/443 from internet"
+  name_prefix = "farmily-jenkins-alb-sg-"
+  description = "Jenkins ALB - GitHub webhook IPs only"
   vpc_id      = local.dev_vpc_id
 
   ingress {
-    description = "HTTPS from internet"
+    description = "GitHub webhook HTTPS"
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [
+      "192.30.252.0/22",
+      "185.199.108.0/22",
+      "140.82.112.0/20",
+      "143.55.64.0/20",
+    ]
+    ipv6_cidr_blocks = ["2a0a:a440::/29", "2606:50c0::/32"]
   }
 
   ingress {
-    description = "HTTP from internet (redirect to HTTPS)"
+    description = "GitHub webhook HTTP (redirect)"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [
+      "192.30.252.0/22",
+      "185.199.108.0/22",
+      "140.82.112.0/20",
+      "143.55.64.0/20",
+    ]
+    ipv6_cidr_blocks = ["2a0a:a440::/29", "2606:50c0::/32"]
   }
 
   egress {
@@ -76,14 +89,16 @@ resource "aws_security_group" "jenkins_alb" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  lifecycle {
+    create_before_destroy = true
+  }
+
   tags = { project = "farmily", team = "urbanwork", purpose = "jenkins-alb" }
 }
 
-# Jenkins EC2 SG에 ALB → 8080 inbound 추가
-# vpn.tf의 jenkins SG를 직접 수정하지 않고 rule로 분리
 resource "aws_security_group_rule" "jenkins_from_alb" {
   type                     = "ingress"
-  description              = "Jenkins UI from ALB"
+  description              = "Jenkins UI from External ALB"
   from_port                = 8080
   to_port                  = 8080
   protocol                 = "tcp"
@@ -92,7 +107,7 @@ resource "aws_security_group_rule" "jenkins_from_alb" {
 }
 
 # ────────────────────────────────────────────────────────────────
-# 3. ALB
+# 3. External ALB
 # ────────────────────────────────────────────────────────────────
 resource "aws_lb" "jenkins" {
   name               = "farmily-jenkins-alb"
@@ -105,7 +120,7 @@ resource "aws_lb" "jenkins" {
 }
 
 # ────────────────────────────────────────────────────────────────
-# 4. Target Group → Jenkins EC2 8080
+# 4. Target Group
 # ────────────────────────────────────────────────────────────────
 resource "aws_lb_target_group" "jenkins" {
   name     = "farmily-jenkins-tg"
@@ -162,7 +177,7 @@ resource "aws_lb_listener" "jenkins_http" {
 }
 
 # ────────────────────────────────────────────────────────────────
-# 6. Route53 A 레코드 (jenkins.farmily.info → ALB)
+# 6. Route53 — jenkins.farmily.info → External ALB (공개 zone)
 # ────────────────────────────────────────────────────────────────
 resource "aws_route53_record" "jenkins" {
   zone_id = data.aws_route53_zone.main.zone_id
@@ -181,5 +196,5 @@ output "jenkins_alb_dns" {
 }
 
 output "jenkins_url" {
-  value = "https://jenkins.farmily.info"
+  value = "https://jenkins.farmily.info (GitHub webhook only)"
 }
