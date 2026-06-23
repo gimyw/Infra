@@ -22,6 +22,7 @@ pipeline {
     HELM_CACHE_HOME  = '/tmp/helm-cache'
     HELM_DATA_HOME   = '/tmp/helm-data'
     HELM_CONFIG_HOME = '/tmp/helm-config'
+    TF_SKIP          = 'false'
   }
 
   stages {
@@ -32,7 +33,28 @@ pipeline {
       }
     }
 
+    stage('Check Changes') {
+      steps {
+        script {
+          def changed = sh(
+            returnStdout: true,
+            script: "git diff --name-only HEAD~1 HEAD 2>/dev/null || git show --name-only --format='' HEAD"
+          ).trim()
+
+          def tfChanged = changed.split('\n').any { f ->
+            f.startsWith('environments/') || f.startsWith('modules/')
+          }
+
+          if (!tfChanged) {
+            env.TF_SKIP = 'true'
+            echo "Terraform 파일 변경 없음 (gitops/ 전용) — Terraform 단계 전체 건너뜀"
+          }
+        }
+      }
+    }
+
     stage('Assume Role') {
+      when { environment name: 'TF_SKIP', value: 'false' }
       steps {
         script {
           // EC2 인스턴스 프로파일(IMDSv2) → apply 역할 가정 (키리스)
@@ -53,6 +75,7 @@ pipeline {
     }
 
     stage('Load Vars') {
+      when { environment name: 'TF_SKIP', value: 'false' }
       steps {
         script {
           def ssm = { String key ->
@@ -69,6 +92,7 @@ pipeline {
     }
 
     stage('Validate') {
+      when { environment name: 'TF_SKIP', value: 'false' }
       steps {
         dir(TF_DIR) {
           sh 'terraform fmt -check -recursive'
@@ -95,6 +119,7 @@ pipeline {
     }
 
     stage('Plan') {
+      when { environment name: 'TF_SKIP', value: 'false' }
       steps {
         dir(TF_DIR) {
           sh 'terraform init -input=false'
