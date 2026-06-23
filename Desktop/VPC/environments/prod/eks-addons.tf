@@ -55,7 +55,7 @@ resource "helm_release" "argocd" {
   chart            = "argo-cd"
   namespace        = "argocd"
   create_namespace = true
-  version          = "7.7.0"
+  version          = "9.6.0"
 }
 
 resource "aws_iam_policy" "lbc" {
