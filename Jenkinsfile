@@ -124,7 +124,7 @@ pipeline {
               echo "삭제/교체가 포함됨 → 자동 적용 차단. plan을 사람이 검토할 것"
               jq -r '.resource_changes[]
                      | select(.change.actions | index("delete"))
-                     | "  - \(.address): \(.change.actions|join(","))"' plan.json
+                     | "  - \\(.address): \\(.change.actions|join(","))"' plan.json
               exit 1
             fi
           '''
