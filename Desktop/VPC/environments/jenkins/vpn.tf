@@ -51,19 +51,19 @@ resource "aws_security_group" "jenkins" {
   vpc_id      = local.dev_vpc_id
 
   ingress {
-    description = "Jenkins UI - VPN clients only"
+    description = "Jenkins UI - via VPN ENI (Client VPN NAT: src IP = VPN ENI, not client IP)"
     from_port   = 8080
     to_port     = 8080
     protocol    = "tcp"
-    cidr_blocks = [local.vpn_cidr]
+    cidr_blocks = ["10.0.10.0/24"]
   }
 
   ingress {
-    description = "SSH - VPN clients only"
+    description = "SSH - via VPN ENI"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = [local.vpn_cidr]
+    cidr_blocks = ["10.0.10.0/24"]
   }
 
   egress {

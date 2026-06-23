@@ -55,8 +55,8 @@ resource "aws_instance" "jenkins" {
     # 시스템 패키지 최신화
     dnf update -y
 
-    # Java 17 — Jenkins LTS 권장 JDK (Amazon Corretto)
-    dnf install -y java-17-amazon-corretto-headless
+    # Java 21 — Jenkins LTS 최소 요구 버전 (Amazon Corretto)
+    dnf install -y java-21-amazon-corretto-headless
 
     # Jenkins LTS 레포 등록 및 설치
     wget -O /etc/yum.repos.d/jenkins.repo \
