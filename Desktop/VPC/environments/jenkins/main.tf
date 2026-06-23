@@ -217,6 +217,11 @@ resource "aws_iam_instance_profile" "jenkins_ec2" {
   role = aws_iam_role.jenkins_ec2.name
 }
 
+resource "aws_iam_role_policy_attachment" "jenkins_ec2_ssm" {
+  role       = aws_iam_role.jenkins_ec2.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
 # ────────────────────────────────────────────────────────────────
 # 2. jenkins-tf-runner-dev
 # ────────────────────────────────────────────────────────────────
