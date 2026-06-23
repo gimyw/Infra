@@ -20,3 +20,11 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+  # istiod가 istio-validator webhook의 failurePolicy를 런타임에 Fail↔Ignore로 동적 관리 →
+  # 차트(Fail)와 클러스터(Ignore)가 어긋나 영구 OutOfSync. 해당 필드 diff만 무시.
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      name: istio-validator-istio-system
+      jqPathExpressions:
+        - '.webhooks[].failurePolicy'
