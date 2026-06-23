@@ -136,7 +136,7 @@ pipeline {
             // PR 빌드일 때만 plan 결과를 PR 코멘트로 기록 (CHANGE_ID = PR 번호)
             if (env.CHANGE_ID) {
               sh 'terraform show -no-color tfplan > plan.txt'
-              withCredentials([string(credentialsId: 'github-token', variable: 'GH_TOKEN')]) {
+              withCredentials([string(credentialsId: 'github-pat-token', variable: 'GH_TOKEN')]) {
                 sh """
                   gh pr comment ${env.CHANGE_ID} \
                     --body "\$(cat plan.txt)" \
