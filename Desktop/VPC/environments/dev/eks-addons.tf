@@ -28,6 +28,24 @@ provider "helm" {
     }
   }
 }
+resource "aws_eks_access_entry" "jenkins_tf_runner" {
+  cluster_name  = module.eks.cluster_name
+  principal_arn = "arn:aws:iam::851957594139:role/farmily/irsa/jenkins-tf-runner-dev"
+  type          = "STANDARD"
+}
+
+resource "aws_eks_access_policy_association" "jenkins_tf_runner" {
+  cluster_name  = module.eks.cluster_name
+  principal_arn = "arn:aws:iam::851957594139:role/farmily/irsa/jenkins-tf-runner-dev"
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+
+  access_scope {
+    type = "cluster"
+  }
+
+  depends_on = [aws_eks_access_entry.jenkins_tf_runner]
+}
+
 resource "helm_release" "argocd" {
   name             = "argocd"
   repository       = "https://argoproj.github.io/argo-helm"

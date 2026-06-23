@@ -60,5 +60,11 @@ resource "aws_db_instance" "main" {
   monitoring_role_arn     = var.monitoring_interval > 0 ? aws_iam_role.rds_monitoring[0].arn : null
 
   tags = { Name = "${var.env}-rds" }
+
+  lifecycle {
+    # db_name·username·password는 생성 후 변경 시 replacement 발생
+    # SSM 파라미터 값 변동으로 인한 의도치 않은 DB 교체 방지
+    ignore_changes = [db_name, username, password]
+  }
 }
 

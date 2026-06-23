@@ -84,6 +84,11 @@ resource "aws_secretsmanager_secret_version" "app_infra" {
     REDIS_HOST  = module.elasticache.primary_endpoint
     S3_BUCKET   = module.s3.bucket_id
   })
+
+  lifecycle {
+    # AWS provider v5.x secret_string_wo 속성 충돌로 perpetual replace 발생 방지
+    ignore_changes = [secret_string]
+  }
 }
 output "app_role_arn" { value = aws_iam_role.app.arn }
 output "eso_reader_role_arn" { value = aws_iam_role.eso_reader.arn }
