@@ -66,3 +66,4 @@ keda:
   query: "SELECT count(*) FROM content_jobs WHERE status IN ('QUEUED','ANALYZING','ENRICHING','GENERATING')"
 
 targetGroupArn: arn:aws:elasticloadbalancing:ap-northeast-2:851957594139:targetgroup/prod-eks-tg/49fea87ed8029421
+istioInjection: true
