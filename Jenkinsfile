@@ -136,7 +136,12 @@ pipeline {
             // PR 빌드일 때만 plan 결과를 PR 코멘트로 기록 (CHANGE_ID = PR 번호)
             if (env.CHANGE_ID) {
               sh 'terraform show -no-color tfplan > plan.txt'
-              withCredentials([string(credentialsId: 'github-pat-token', variable: 'GH_TOKEN')]) {
+              // farmily-gitops-bot GitHub App credential — 빌드마다 단명 installation 토큰 발급.
+              // 개인 PAT(github-pat-token) 제거 → terraform plan 코멘트가 사람이 아닌 봇 이름으로 게시됨.
+              // GitHub App credential은 usernamePassword 형: username=App ID, password=발급된 토큰.
+              withCredentials([usernamePassword(credentialsId: 'github-app-gitops-bot',
+                                                usernameVariable: 'GH_APP_ID',
+                                                passwordVariable: 'GH_TOKEN')]) {
                 sh """
                   gh pr comment ${env.CHANGE_ID} \
                     --body "\$(cat plan.txt)" \
