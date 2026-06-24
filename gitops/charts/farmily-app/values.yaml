@@ -58,3 +58,4 @@ keda:
 
 # ── ALB 연결(TargetGroupBinding) ────────────────────────
 targetGroupArn: ""   # apply 후 {env}-eks-tg ARN. values-{env} 에서 지정
+istioInjection: false
