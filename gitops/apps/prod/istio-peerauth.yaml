@@ -1,0 +1,27 @@
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: farmily-prod
+  annotations: 
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  mtls:
+    mode: STRICT
+---
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: farmily-app-alb-ingress
+  namespace: farmily-prod
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  selector:
+    matchLabels:
+      app: farmily-app
+  mtls: 
+    mode: STRICT
+  portLevelMtls:
+    8080:
+      mode: PERMISSIVE
