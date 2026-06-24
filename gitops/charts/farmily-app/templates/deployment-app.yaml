@@ -16,7 +16,7 @@ spec:
       serviceAccountName: {{ .Values.app.name }}
       containers:
         - name: {{ .Values.app.name }}
-          image: {{ .Values.app.image }}
+          image: {{ .Values.app.image.repository }}:{{ .Values.app.image.tag }}
           ports:
             - containerPort: {{ .Values.app.port }}
           {{- with .Values.app.resources }}

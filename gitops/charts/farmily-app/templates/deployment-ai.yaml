@@ -17,7 +17,7 @@ spec:
       serviceAccountName: {{ .Values.ai.name }}
       containers:
         - name: {{ .Values.ai.name }}
-          image: {{ .Values.ai.image }}
+          image: {{ .Values.ai.image.repository }}:{{ .Values.ai.image.tag }}
           ports:
             - containerPort: {{ .Values.ai.port }}
           {{- with .Values.ai.resources }}

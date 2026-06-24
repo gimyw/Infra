@@ -3,7 +3,9 @@ namespace: farmily-prod
 
 app:
   # 불변 SHA 태그로 핀(롤백 추적). latest 금지. 새 배포 = prod-<sha> 갱신.
-  image: 851957594139.dkr.ecr.ap-northeast-2.amazonaws.com/farmily-api:prod-881c370
+  image:
+    repository: 851957594139.dkr.ecr.ap-northeast-2.amazonaws.com/farmily-api
+    tag: prod-881c370
   roleArn: arn:aws:iam::851957594139:role/prod-eks-app-role
   replicas: 2
   resources:
@@ -25,7 +27,9 @@ eso:
 
 ai:
   enabled: true
-  image: 851957594139.dkr.ecr.ap-northeast-2.amazonaws.com/farmily-agentcore:prod-4d3b3871fa92e9e1af86e15e8ed25c2a7d376751
+  image:
+    repository: 851957594139.dkr.ecr.ap-northeast-2.amazonaws.com/farmily-agentcore
+    tag: prod-4d3b3871fa92e9e1af86e15e8ed25c2a7d376751
   roleArn: arn:aws:iam::851957594139:role/prod-eks-agentcore-role
   replicas: 2
   resources:

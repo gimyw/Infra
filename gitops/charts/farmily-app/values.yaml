@@ -10,7 +10,9 @@ namespace: ""
 # ── 앱(Spring, farmily-app) ──────────────────────────────
 app:
   name: farmily-app
-  image: ""          # 환경별 ECR 태그(불변 SHA). values-{env} 에서 지정
+  image:             # 환경별 ECR repo+태그(불변 SHA). values-{env} 에서 지정
+    repository: ""
+    tag: ""
   roleArn: ""        # IRSA(앱 S3 등). values-{env} 에서 지정
   replicas: 1
   port: 8080
@@ -22,7 +24,9 @@ app:
 ai:
   enabled: false     # prod 에서만 true
   name: farmily-app-ai
-  image: ""
+  image:
+    repository: ""
+    tag: ""
   roleArn: ""
   replicas: 2
   port: 8080
