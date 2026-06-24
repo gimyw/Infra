@@ -1,0 +1,70 @@
+// gitops 검증 파이프라인 — gitops/ PR 시 helm 렌더 → 스키마 → 정책 검증. 배포는 안 함(ArgoCD 담당), AWS 권한 0.
+// Jenkins Job(Multibranch) Script Path = Jenkinsfile.gitops, 트리거 = gitops/ 경로 PR. (terraform 파이프라인과 별도 Job)
+pipeline {
+  agent {
+    docker {
+      image '851957594139.dkr.ecr.ap-northeast-2.amazonaws.com/farmily-gitops-agent:1.0'
+      args '--entrypoint=""'   // 에이전트 기본 ENTRYPOINT 무시(Jenkins가 sh 주입)
+    }
+  }
+
+  options {
+    timeout(time: 10, unit: 'MINUTES')
+    disableConcurrentBuilds()
+  }
+
+  environment {
+    CHART = 'gitops/charts/farmily-app'
+  }
+
+  stages {
+    // ① helm 렌더링 — values-dev/prod 각각 최종 매니페스트 산출(템플릿 에러 1차 차단)
+    stage('Helm Template') {
+      steps {
+        sh '''
+          helm template farmily-app ${CHART} -f ${CHART}/values-dev.yaml  > /tmp/dev.yaml
+          helm template farmily-app ${CHART} -f ${CHART}/values-prod.yaml > /tmp/prod.yaml
+        '''
+      }
+    }
+
+    // ② 스키마 검증 — K8s 코어 + CRD(datreeio 카탈로그). 미보유 CRD는 skip(-ignore-missing-schemas)
+    stage('Schema Validate (kubeconform)') {
+      steps {
+        sh '''
+          kubeconform -strict -summary -ignore-missing-schemas \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            /tmp/dev.yaml /tmp/prod.yaml
+        '''
+      }
+    }
+
+    // ③ 정책 검증 — conftest(rego). 초기 soft(--no-fail=경고만). 신뢰 쌓이면 --no-fail 제거해 hard 전환.
+    stage('Policy (conftest, soft)') {
+      steps {
+        sh 'conftest test --no-fail -p policy /tmp/dev.yaml /tmp/prod.yaml'
+      }
+    }
+  }
+
+  // Slack 알림 — terraform 파이프라인과 동일 방식(slack-infra-webhook + curl, #farmily-인프라)
+  post {
+    success {
+      withCredentials([string(credentialsId: 'slack-infra-webhook', variable: 'SLACK_URL')]) {
+        sh '''
+          curl -sf -X POST -H 'Content-type: application/json' \
+            --data "{\\"text\\":\\"✅ gitops 검증 통과 — ${JOB_NAME} #${BUILD_NUMBER}\\"}" "$SLACK_URL"
+        '''
+      }
+    }
+    failure {
+      withCredentials([string(credentialsId: 'slack-infra-webhook', variable: 'SLACK_URL')]) {
+        sh '''
+          curl -sf -X POST -H 'Content-type: application/json' \
+            --data "{\\"text\\":\\"❌ gitops 검증 실패 — ${JOB_NAME} #${BUILD_NUMBER} | ${BUILD_URL}\\"}" "$SLACK_URL"
+        '''
+      }
+    }
+  }
+}
