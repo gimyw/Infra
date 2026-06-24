@@ -1,0 +1,11 @@
+{{- if .Values.ai.enabled }}
+# 인클러스터 Service — Spring 이 http://farmily-app-ai:8080 로 호출
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.ai.name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  selector: { app: {{ .Values.ai.name }} }
+  ports: [ { port: {{ .Values.ai.port }}, targetPort: {{ .Values.ai.port }} } ]
+{{- end }}

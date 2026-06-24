@@ -1,0 +1,13 @@
+# Service ↔ {env}-eks-tg 연결. LBC 가 파드 IP 를 TG 에 직접 등록(target-type=ip)
+apiVersion: elbv2.k8s.aws/v1beta1
+kind: TargetGroupBinding
+metadata:
+  name: {{ .Values.app.name }}
+  namespace: {{ .Values.namespace }}
+  annotations:
+    # LBC CRD(elbv2.k8s.aws)가 아직 없을 때 dry-run 으로 전체 sync 막히는 것 방지.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  serviceRef: { name: {{ .Values.app.name }}, port: {{ .Values.app.port }} }
+  targetGroupARN: {{ .Values.targetGroupArn }}
+  targetType: ip

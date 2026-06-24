@@ -1,0 +1,6 @@
+apiVersion: v2
+name: farmily-app
+description: Farmily 앱(Spring) + AgentCore(AI) + 시크릿 배선(ESO) + ALB 연결(TGB) 통합 차트. 환경 차이는 values-{env}.yaml 로만.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

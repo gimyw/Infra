@@ -1,0 +1,36 @@
+{{- if .Values.keda.enabled }}
+# KEDA — PostgreSQL 작업 큐 깊이로 farmily-app-ai 스케일
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: keda-pg-auth
+  namespace: {{ .Values.namespace }}
+  annotations:
+    # KEDA CRD 가 차트보다 늦게 깔려도 dry-run 으로 전체 sync 막히지 않게
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  secretTargetRef:
+    - { parameter: connection, name: keda-pg-secret, key: connection }
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ .Values.ai.name }}
+  namespace: {{ .Values.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  scaleTargetRef:
+    name: {{ .Values.ai.name }}
+  minReplicaCount: {{ .Values.keda.minReplicaCount }}
+  maxReplicaCount: {{ .Values.keda.maxReplicaCount }}
+  pollingInterval: {{ .Values.keda.pollingInterval }}    # N초마다 큐 깊이 확인
+  cooldownPeriod: {{ .Values.keda.cooldownPeriod }}      # 마지막 부하 후 축소 대기
+  triggers:
+    - type: postgresql
+      metadata:
+        query: {{ .Values.keda.query | quote }}
+        targetQueryValue: {{ .Values.keda.targetQueryValue | quote }}
+      authenticationRef:
+        name: keda-pg-auth
+{{- end }}

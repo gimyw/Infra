@@ -1,0 +1,60 @@
+# 공통 기본값. 환경별 차이는 values-dev.yaml / values-prod.yaml 에서 덮어쓴다.
+# 원칙: templates/ 는 dev/prod 한 벌. 다른 값은 전부 여기(values)로.
+
+region: ap-northeast-2
+account: "851957594139"
+
+# namespace 는 환경별 필수 (values-{env}.yaml 에서 지정)
+namespace: ""
+
+# ── 앱(Spring, farmily-app) ──────────────────────────────
+app:
+  name: farmily-app
+  image: ""          # 환경별 ECR 태그(불변 SHA). values-{env} 에서 지정
+  roleArn: ""        # IRSA(앱 S3 등). values-{env} 에서 지정
+  replicas: 1
+  port: 8080
+  health: /api/v1/health
+  resources: {}      # 비우면 resources 블록 생략(dev). prod 는 requests/limits 지정
+  env: []            # name/value 또는 name/valueFrom 목록. values-{env} 가 통째로 제공
+
+# ── AI(AgentCore, farmily-app-ai) — prod 전용 ───────────
+ai:
+  enabled: false     # prod 에서만 true
+  name: farmily-app-ai
+  image: ""
+  roleArn: ""
+  replicas: 2
+  port: 8080
+  health: /ping
+  resources: {}
+  env: []
+
+# ── 시크릿 배선(ESO) ────────────────────────────────────
+eso:
+  roleArn: ""        # eso-reader IRSA. values-{env} 에서 지정
+  store: aws-sm
+  refreshInterval: 1h
+  paths: []          # extract 할 Secrets Manager 키 목록(farmily/<env>/app, app-infra)
+
+# ── HPA(farmily-app) — prod 전용 ────────────────────────
+hpa:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPU: 60
+  scaleUpStabilization: 30
+  scaleDownStabilization: 300
+
+# ── KEDA(farmily-app-ai, PG 큐 기반) — prod 전용 ────────
+keda:
+  enabled: false
+  minReplicaCount: 2
+  maxReplicaCount: 5
+  pollingInterval: 15
+  cooldownPeriod: 300
+  targetQueryValue: "3"
+  query: ""
+
+# ── ALB 연결(TargetGroupBinding) ────────────────────────
+targetGroupArn: ""   # apply 후 {env}-eks-tg ARN. values-{env} 에서 지정

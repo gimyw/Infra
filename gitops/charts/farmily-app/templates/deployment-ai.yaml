@@ -1,0 +1,41 @@
+{{- if .Values.ai.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.ai.name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: {{ .Values.ai.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.ai.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.ai.name }}
+    spec:
+      serviceAccountName: {{ .Values.ai.name }}
+      containers:
+        - name: {{ .Values.ai.name }}
+          image: {{ .Values.ai.image }}
+          ports:
+            - containerPort: {{ .Values.ai.port }}
+          {{- with .Values.ai.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          env:
+            {{- toYaml .Values.ai.env | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.ai.health }}
+              port: {{ .Values.ai.port }}
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.ai.health }}
+              port: {{ .Values.ai.port }}
+            initialDelaySeconds: 90
+            periodSeconds: 15
+{{- end }}
