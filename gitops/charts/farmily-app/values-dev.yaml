@@ -3,7 +3,7 @@ namespace: farmily-dev
 app:
   image:
     repository: 851957594139.dkr.ecr.ap-northeast-2.amazonaws.com/farmily-api-dev
-    tag: dev-ae0ed59
+    tag: dev-212fb64
   roleArn: arn:aws:iam::851957594139:role/dev-eks-app-role
   replicas: 1
   # dev 는 resources 미지정(기본값 {} → 블록 생략)
