@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kiali
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://kiali.org/helm-charts
+    chart: kiali-server
+    targetRevision: 2.26.0
+    helm:
+      values: |
+        auth:
+          strategy: anonymous            # 학습용. 운영은 openid/token
+        istio_namespace: istio-system
+        external_services:
+          prometheus:
+            url: http://kube-prometheus-stack-prometheus.monitoring:9090   # ← 확인된 주소
+          tracing:
+            enabled: false               # Jaeger/Tempo 는 방법 A 트랙에서 나중에 → 지금 끔
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: istio-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    
