@@ -14,11 +14,6 @@ spec:
     metadata:
       labels:
         app: {{ .Values.app.name }}
-      {{- if .Values.appSignals }}
-      annotations:
-        # CloudWatch Application Signals — 오퍼레이터가 ADOT 자바에이전트를 런타임 주입(이미지 무수정).
-        instrumentation.opentelemetry.io/inject-java: "true"
-      {{- end }}
     spec:
       serviceAccountName: {{ .Values.app.name }}
       containers:
