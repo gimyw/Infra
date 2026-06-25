@@ -6,6 +6,7 @@ account: "851957594139"
 
 # namespace 는 환경별 필수 (values-{env}.yaml 에서 지정)
 namespace: ""
+namespaceCreate: true
 
 # ── 앱(Spring, farmily-app) ──────────────────────────────
 app:

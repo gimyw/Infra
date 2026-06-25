@@ -29,6 +29,34 @@ provider "helm" {
   }
 }
 
+resource "aws_iam_policy" "lbc" {
+  name   = "dr-eks-lbc-policy"
+  policy = file("${path.module}/iam/lbc-iam-policy.json")
+}
+
+resource "aws_iam_role" "lbc" {
+  name = "dr-eks-lbc-role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Federated = module.eks.oidc_provider_arn }
+      Action    = "sts:AssumeRoleWithWebIdentity"
+      Condition = {
+        StringEquals = {
+          "${local.oidc_host}:aud" = "sts.amazonaws.com"
+          "${local.oidc_host}:sub" = "system:serviceaccount:kube-system:aws-load-balancer-controller"
+        }
+      }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "lbc" {
+  role       = aws_iam_role.lbc.name
+  policy_arn = aws_iam_policy.lbc.arn
+}
+
 resource "kubernetes_namespace" "farmily_dr" {
   metadata {
     name = "farmily-dr"
@@ -51,6 +79,51 @@ resource "helm_release" "metrics_server" {
   })]
 
   depends_on = [module.eks]
+}
+
+resource "helm_release" "external_secrets" {
+  name             = "external-secrets"
+  repository       = "https://charts.external-secrets.io"
+  chart            = "external-secrets"
+  namespace        = "external-secrets"
+  version          = "0.10.5"
+  create_namespace = true
+  wait             = false
+
+  values = [yamlencode({
+    installCRDs = true
+  })]
+
+  depends_on = [
+    module.eks,
+    helm_release.aws_load_balancer_controller
+  ]
+}
+
+resource "helm_release" "aws_load_balancer_controller" {
+  name       = "aws-load-balancer-controller"
+  repository = "https://aws.github.io/eks-charts"
+  chart      = "aws-load-balancer-controller"
+  namespace  = "kube-system"
+  version    = "1.14.0"
+
+  values = [yamlencode({
+    clusterName = module.eks.cluster_name
+    region      = var.region
+    vpcId       = module.vpc.vpc_id
+    serviceAccount = {
+      create = true
+      name   = "aws-load-balancer-controller"
+      annotations = {
+        "eks.amazonaws.com/role-arn" = aws_iam_role.lbc.arn
+      }
+    }
+  })]
+
+  depends_on = [
+    module.eks,
+    aws_iam_role_policy_attachment.lbc
+  ]
 }
 
 resource "aws_iam_role" "cluster_autoscaler" {
@@ -175,7 +248,7 @@ resource "kubernetes_horizontal_pod_autoscaler_v2" "farmily_app" {
     behavior {
       scale_up {
         stabilization_window_seconds = 30
-        select_policy                 = "Max"
+        select_policy                = "Max"
         policy {
           type           = "Percent"
           value          = 100
@@ -189,7 +262,7 @@ resource "kubernetes_horizontal_pod_autoscaler_v2" "farmily_app" {
       }
       scale_down {
         stabilization_window_seconds = 300
-        select_policy                 = "Max"
+        select_policy                = "Max"
         policy {
           type           = "Percent"
           value          = 100
