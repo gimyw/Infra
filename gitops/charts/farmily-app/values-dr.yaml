@@ -1,0 +1,41 @@
+# DR 환경 차이만. GitOps 없이 Helm CLI로 1회 배포할 때 사용한다.
+namespace: farmily-dr
+namespaceCreate: false
+region: ap-northeast-1
+
+app:
+  image:
+    repository: 851957594139.dkr.ecr.ap-northeast-2.amazonaws.com/farmily-api
+    tag: prod-46135a6
+  roleArn: arn:aws:iam::851957594139:role/dr-eks-app-role
+  replicas: 2
+  resources:
+    requests: {cpu: 250m, memory: 512Mi}
+    limits: {cpu: "1", memory: 1Gi}
+  env:
+    - {name: SPRING_PROFILES_ACTIVE, value: "prod"}
+    - {name: APP_VARIANT, value: "eks"}
+    - {name: S3_REGION, value: "ap-northeast-1"}
+    - {name: AUTH_DEV_MASTER_ENABLED, value: "true"}
+
+eso:
+  roleArn: arn:aws:iam::851957594139:role/dr-eks-eso-reader-role
+  paths:
+    - farmily/dr/app
+    - farmily/dr/app-infra
+
+ai:
+  enabled: false
+
+hpa:
+  enabled: false
+
+keda:
+  enabled: false
+
+targetGroupArn: arn:aws:elasticloadbalancing:ap-northeast-1:851957594139:targetgroup/dr-eks-tg/a05dcee8474c3fa3
+istioInjection: false
+appSignals: false
+
+canary:
+  enabled: false
