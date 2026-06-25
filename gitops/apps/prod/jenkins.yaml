@@ -1,0 +1,60 @@
+# 네임스페이스 및 상한선 제한
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: jenkins-build
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: defaults
+  namespace: jenkins-build
+spec:
+  limits:
+    - type: Container
+      default: { cpu: "1",  memory: 2Gi }
+      defaultRequest: { cpu: 500m, memory: 1Gi }
+---
+#에이전트 SA (IRSA = AWS 권한)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jenkins-agent
+  namespace: jenkins-build
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::851957594139:role/prod-eks-jenkins-tf-role
+---
+# RBAC, 컨트롤러가 파드를 다룰 수 있어야 함
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: jenkins-agent
+  namespace: jenkins-build
+rules:
+  - apiGroups: [""]
+    resources: ["pods","pods/exec","pods/log"]
+    verbs: ["get","list","watch","create","delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: jenkins-agent
+  namespace: jenkins-build
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: jenkins-agent
+subjects:
+  - kind: ServiceAccount
+    name: jenkins-agent
+    namespace: jenkins-build
+---
+# 컨트롤러 인증용 토큰
+apiVersion: v1
+kind: Secret
+metadata:
+  name: jenkins-agent-token
+  namespace: jenkins-build
+  annotations:
+    kubernetes.io/service-account.name: jenkins-agent
+type: kubernetes.io/service-account-token
