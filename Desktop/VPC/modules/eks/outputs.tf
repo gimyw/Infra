@@ -25,3 +25,7 @@ output "oidc_provider_url"{
 output "node_role_arn"{
     value = aws_iam_role.node.arn
 }
+
+output "node_group_autoscaling_group_names" {
+    value = [for asg in aws_eks_node_group.default.resources[0].autoscaling_groups : asg.name]
+}

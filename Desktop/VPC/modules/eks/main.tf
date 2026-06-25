@@ -128,4 +128,3 @@ resource "aws_eks_addon" "coredns" {
 
     depends_on = [ aws_eks_node_group.default ]
 }
-

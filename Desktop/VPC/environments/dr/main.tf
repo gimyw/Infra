@@ -6,6 +6,14 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.30"
+    }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.17"
+    }
   }
 }
 
@@ -26,7 +34,7 @@ module "vpc" {
   public_subnet_c_cidr  = "10.2.2.0/24"
   private_subnet_a_cidr = "10.2.10.0/24"
   private_subnet_c_cidr = "10.2.11.0/24"
-  enable_multi_nat      = false   # DR cost optimization: single NAT
+  enable_multi_nat      = false # DR cost optimization: single NAT
   enable_vpn            = false
 }
 
@@ -36,11 +44,11 @@ module "vpc" {
 module "sg" {
   source = "../../modules/sg"
 
-  env               = "dr"
-  vpc_id            = module.vpc.vpc_id
-  enable_lambda_sg  = false
+  env                   = "dr"
+  vpc_id                = module.vpc.vpc_id
+  enable_lambda_sg      = false
   enable_noti_lambda_sg = false
-  eks_cluster_sg_id = module.eks.cluster_security_group_id
+  eks_cluster_sg_id     = module.eks.cluster_security_group_id
 }
 
 # ==============================================================================
@@ -57,9 +65,9 @@ module "eks" {
 
   cluster_version     = "1.35"
   node_instance_types = ["t3.medium"]
-  node_desired_size   = 1   # Warm Standby: 최소 노드
+  node_desired_size   = 1 # Warm Standby: 최소 노드
   node_min_size       = 1
-  node_max_size       = 6   # Failover 시 스케일아웃 허용
+  node_max_size       = 6 # Failover 시 스케일아웃 허용
 }
 
 # ALB -> EKS 파드 인바운드 규칙
