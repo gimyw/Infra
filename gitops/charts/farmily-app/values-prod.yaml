@@ -1,33 +1,30 @@
 # prod 환경 차이만. (app + AI + HPA + KEDA 전부)
 namespace: farmily-prod
-
 app:
   # 불변 SHA 태그로 핀(롤백 추적). latest 금지. 새 배포 = prod-<sha> 갱신.
   image:
     repository: 851957594139.dkr.ecr.ap-northeast-2.amazonaws.com/farmily-api
-    tag: prod-e5ff39a
+    tag: prod-46135a6
   roleArn: arn:aws:iam::851957594139:role/prod-eks-app-role
   replicas: 2
   resources:
-    requests: { cpu: 250m, memory: 512Mi }
-    limits:   { cpu: "1",  memory: 1Gi }     # 스프링 백엔드가 무거워 1C/1G
+    requests: {cpu: 250m, memory: 512Mi}
+    limits: {cpu: "1", memory: 1Gi} # 스프링 백엔드가 무거워 1C/1G
   env:
-    - { name: SPRING_PROFILES_ACTIVE,  value: "prod" }
-    - { name: APP_VARIANT,             value: "eks" }            # ★ ECS vs EKS 식별
-    - { name: S3_REGION,               value: "ap-northeast-2" }
-    - { name: AGENTCORE_URL,           value: "http://farmily-app-ai:8080" }
-    - { name: AUTH_DEV_MASTER_ENABLED, value: "true" }
-    - { name: AI_PROVIDER,             value: "agentcore" }
+    - {name: SPRING_PROFILES_ACTIVE, value: "prod"}
+    - {name: APP_VARIANT, value: "eks"} # ★ ECS vs EKS 식별
+    - {name: S3_REGION, value: "ap-northeast-2"}
+    - {name: AGENTCORE_URL, value: "http://farmily-app-ai:8080"}
+    - {name: AUTH_DEV_MASTER_ENABLED, value: "true"}
+    - {name: AI_PROVIDER, value: "agentcore",}
     # 백엔드 트레이싱은 자체 Tempo → CloudWatch Application Signals 로 이전. (DR 생존: 관측 평면을 클러스터 밖으로)
     # 계측은 amazon-cloudwatch-observability 애드온이 ADOT 자바에이전트를 자동 주입 → 트레이스용 OTEL_* env 불필요(주입 측이 세팅).
     # 활성화 스위치 = templates/deployment-app.yaml 의 inject-java 어노테이션 (Phase 3, 백엔드 이미지 승격 후).
-
 eso:
   roleArn: arn:aws:iam::851957594139:role/prod-eks-eso-reader-role
   paths:
-    - farmily/prod/app         # 진짜 시크릿(외부 관리)
-    - farmily/prod/app-infra   # 인프라값(DB_URL·REDIS_HOST 등, Terraform 생성)
-
+    - farmily/prod/app # 진짜 시크릿(외부 관리)
+    - farmily/prod/app-infra # 인프라값(DB_URL·REDIS_HOST 등, Terraform 생성)
 ai:
   enabled: true
   image:
@@ -38,52 +35,47 @@ ai:
   roleArn: arn:aws:iam::851957594139:role/prod-eks-agentcore-role
   replicas: 2
   resources:
-    requests: { cpu: 500m, memory: 1Gi }
-    limits:   { cpu: "1",  memory: 2Gi }
+    requests: {cpu: 500m, memory: 1Gi}
+    limits: {cpu: "1", memory: 2Gi}
   env:
     # 비밀 아닌 운영 설정 (IAM/SG로 막혀 평문 OK)
-    - { name: MODEL_ID,             value: "apac.anthropic.claude-3-5-sonnet-20241022-v2:0" }
-    - { name: AWS_REGION,           value: "ap-northeast-2" }
-    - { name: GUARDRAIL_ID,         value: "pbebv1rby749" }
-    - { name: GUARDRAIL_VERSION,    value: "1" }
-    - { name: CARD_RENDERER_LAMBDA, value: "farmily-card-renderer" }
-    - { name: SELECT_PHOTO_LAMBDA,  value: "farmily-select-photo" }
+    - {name: MODEL_ID, value: "apac.anthropic.claude-3-5-sonnet-20241022-v2:0"}
+    - {name: AWS_REGION, value: "ap-northeast-2"}
+    - {name: GUARDRAIL_ID, value: "pbebv1rby749"}
+    - {name: GUARDRAIL_VERSION, value: "1"}
+    - {name: CARD_RENDERER_LAMBDA, value: "farmily-card-renderer"}
+    - {name: SELECT_PHOTO_LAMBDA, value: "farmily-select-photo"}
     # OTel 관측은 이미지에 박힘. 아래 2개만 pod env 로 override(이미지 ENV 를 덮음):
     # ① deployment.environment=eks 로 ECS(동일 service.name)와 분리 ② 로그그룹을 /eks/* 로 분리.
-    - { name: OTEL_RESOURCE_ATTRIBUTES,       value: "service.name=farmily-agentcore,deployment.environment=eks" }
-    - { name: OTEL_EXPORTER_OTLP_LOGS_HEADERS, value: "x-aws-log-group=/eks/farmily-agentcore,x-aws-log-stream=otel,x-aws-metric-namespace=Farmily/AgentCore" }
+    - {name: OTEL_RESOURCE_ATTRIBUTES, value: "service.name=farmily-agentcore,deployment.environment=eks"}
+    - {name: OTEL_EXPORTER_OTLP_LOGS_HEADERS, value: "x-aws-log-group=/eks/farmily-agentcore,x-aws-log-stream=otel,x-aws-metric-namespace=Farmily/AgentCore"}
     # 버킷명 + DB 접속정보 — public 노출 방지 위해 app-secrets 경유
-    - { name: S3_BUCKET,       valueFrom: { secretKeyRef: { name: app-secrets, key: S3_BUCKET } } }
-    - { name: TEMPLATE_BUCKET, valueFrom: { secretKeyRef: { name: app-secrets, key: TEMPLATE_BUCKET } } }
-    - { name: DB_HOST,         valueFrom: { secretKeyRef: { name: app-secrets, key: DB_HOST } } }
-    - { name: DB_PORT,         valueFrom: { secretKeyRef: { name: app-secrets, key: DB_PORT } } }
-    - { name: DB_NAME,         valueFrom: { secretKeyRef: { name: app-secrets, key: DB_NAME } } }
-    - { name: DB_USER,         valueFrom: { secretKeyRef: { name: app-secrets, key: DB_USER } } }
-    - { name: DB_PASSWORD,     valueFrom: { secretKeyRef: { name: app-secrets, key: DB_PASSWORD } } }
-
+    - {name: S3_BUCKET, valueFrom: {secretKeyRef: {name: app-secrets, key: S3_BUCKET}}}
+    - {name: TEMPLATE_BUCKET, valueFrom: {secretKeyRef: {name: app-secrets, key: TEMPLATE_BUCKET}}}
+    - {name: DB_HOST, valueFrom: {secretKeyRef: {name: app-secrets, key: DB_HOST}}}
+    - {name: DB_PORT, valueFrom: {secretKeyRef: {name: app-secrets, key: DB_PORT}}}
+    - {name: DB_NAME, valueFrom: {secretKeyRef: {name: app-secrets, key: DB_NAME}}}
+    - {name: DB_USER, valueFrom: {secretKeyRef: {name: app-secrets, key: DB_USER}}}
+    - {name: DB_PASSWORD, valueFrom: {secretKeyRef: {name: app-secrets, key: DB_PASSWORD}}}
 hpa:
   enabled: true
   minReplicas: 2
   maxReplicas: 6
-  targetCPU: 60               # 평균 CPU 60%
+  targetCPU: 60 # 평균 CPU 60%
   scaleUpStabilization: 30
   scaleDownStabilization: 300 # 줄일 땐 5분 천천히
-
 keda:
   enabled: true
   minReplicaCount: 2
   maxReplicaCount: 5
-  pollingInterval: 15         # 15초마다 큐 깊이 확인
-  cooldownPeriod: 300         # 마지막 부하 후 5분 뒤 축소
+  pollingInterval: 15 # 15초마다 큐 깊이 확인
+  cooldownPeriod: 300 # 마지막 부하 후 5분 뒤 축소
   targetQueryValue: "3"
   query: "SELECT count(*) FROM content_jobs WHERE status IN ('QUEUED','ANALYZING','ENRICHING','GENERATING')"
-
 targetGroupArn: arn:aws:elasticloadbalancing:ap-northeast-2:851957594139:targetgroup/prod-eks-tg/49fea87ed8029421
 istioInjection: true
-
 # 백엔드 트레이스 → CloudWatch Application Signals (ADOT 자동주입). 선결: amazon-cloudwatch-observability 애드온(Phase 1).
 appSignals: true
-
 # 카나리 활성 — 워크로드 Rollout 전환 + VS/DR + AnalysisTemplate + HPA 재배선
 canary:
   enabled: true
