@@ -233,7 +233,8 @@ resource "aws_iam_role" "tf_runner_dev" {
     Version = "2012-10-17"
     Statement = [{
       Effect    = "Allow"
-      Principal = { AWS = "arn:aws:iam::${local.account_id}:role/farmily-jenkins-ec2-role" }
+      Principal = { AWS =[ "arn:aws:iam::${local.account_id}:role/farmily-jenkins-ec2-role",
+                            "arn:aws:iam::${local.account_id}:role/prod-eks-jenkins-tf-role"]}
       Action    = "sts:AssumeRole"
       Condition = {
         # ExternalId 없으면 ec2-role 탈취 시 dev 환경 적용 가능 — confused deputy 방어
@@ -267,7 +268,10 @@ resource "aws_iam_role" "tf_runner_prod" {
     Version = "2012-10-17"
     Statement = [{
       Effect    = "Allow"
-      Principal = { AWS = "arn:aws:iam::${local.account_id}:role/farmily-jenkins-ec2-role" }
+      Principal = { AWS = [
+        "arn:aws:iam::${local.account_id}:role/farmily-jenkins-ec2-role",
+        "arn:aws:iam::${local.account_id}:role/prod-eks-jenkins-tf-role",
+      ]}
       Action    = "sts:AssumeRole"
       Condition = {
         StringEquals = { "sts:ExternalId" = "farmily-tf-prod" }
