@@ -25,6 +25,11 @@ spec:
                   - key: eks.amazonaws.com/nodegroup
                     operator: In
                     values: ["prod-eks-ng"]
+        # karpenter_*(노드 프로비저닝·노드클레임) 메트릭 ServiceMonitor 생성. release 라벨로 선택되게 함.
+        serviceMonitor:
+          enabled: true
+          additionalLabels:
+            release: kube-prometheus-stack
 
   destination:
     server: https://kubernetes.default.svc

@@ -9,6 +9,23 @@ spec:
     repoURL: https://kedacore.github.io/charts  
     chart: keda
     targetRevision: 2.20.1
+    helm:
+      values: |
+        # operator: keda_scaler_*(스케일러 활성·큐깊이 등) 메트릭 노출. metricServer: 어댑터 메트릭.
+        # 각 ServiceMonitor에 release 라벨을 박아 kube-prometheus-stack Prometheus가 선택하게 함.
+        prometheus:
+          operator:
+            enabled: true
+            serviceMonitor:
+              enabled: true
+              additionalLabels:
+                release: kube-prometheus-stack
+          metricServer:
+            enabled: true
+            serviceMonitor:
+              enabled: true
+              additionalLabels:
+                release: kube-prometheus-stack
   destination:
     server: https://kubernetes.default.svc
     namespace: keda

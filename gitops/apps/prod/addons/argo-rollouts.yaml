@@ -15,6 +15,16 @@ spec:
     repoURL: https://argoproj.github.io/argo-helm
     chart: argo-rollouts
     targetRevision: 2.40.10        # 최신 2.41.0 대신 안정 패치로 핀(신규 minor 회피)
+    helm:
+      values: |
+        # rollout_*(롤아웃 상태·페이즈·분석) 메트릭 노출 + metrics Service(8090) + ServiceMonitor 생성.
+        controller:
+          metrics:
+            enabled: true
+            serviceMonitor:
+              enabled: true
+              additionalLabels:
+                release: kube-prometheus-stack
   destination:
     server: https://kubernetes.default.svc
     namespace: argo-rollouts
