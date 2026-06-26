@@ -29,9 +29,10 @@ ai:
   enabled: true
   image:
     repository: 851957594139.dkr.ecr.ap-northeast-2.amazonaws.com/farmily-agentcore
-    # OTel 계측(opentelemetry-instrument + aws-opentelemetry-distro)이 들어간 빌드로 bump.
-    # 이전 prod-4d3b3871 은 OTel 도입 커밋(96030adb) 이전 빌드라 GenAI 관측이 안 됐음.
-    tag: prod-0511ae7f1c66299b75ccc46bb2cecae9922458ff
+    # cache_prompt 제거(7ef0501) 반영 빌드로 bump.
+    # 이전 prod-0511ae7f 는 프롬프트 캐싱이 살아있어 Guardrail 동시 사용 시
+    # ConverseStream 이 AccessDenied(unsupported model or prompt caching)로 거부 → 모든 job 실패.
+    tag: prod-1a6098db764feda48ba692e4e0ad1c456812b9ff
   roleArn: arn:aws:iam::851957594139:role/prod-eks-agentcore-role
   replicas: 2
   resources:
