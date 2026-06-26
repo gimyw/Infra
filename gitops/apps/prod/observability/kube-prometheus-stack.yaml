@@ -14,9 +14,27 @@ spec:
         grafana:
           enabled: true
         prometheus:
+          # AMP remote-write 시 SigV4 서명에 쓸 IRSA 역할을 Prometheus 파드 SA에 연결.
+          # SA명은 차트 기본값(kube-prometheus-stack-prometheus) 유지 → 어노테이션만 추가.
+          # amp.tf 신뢰정책의 sub(system:serviceaccount:monitoring:kube-prometheus-stack-prometheus)와 정확히 일치해야 AssumeRole 성공.
+          serviceAccount:
+            create: true
+            annotations:
+              eks.amazonaws.com/role-arn: arn:aws:iam::851957594139:role/prod-eks-amp-write-role
           prometheusSpec:
-            # 메트릭 보관 기간. 15일치 보관 후 자동 삭제
+            # 메트릭 보관 기간. 15일치 보관 후 자동 삭제 (로컬 TSDB)
             retention: 15d
+            # 클러스터 밖 AMP로 송신 → 서울 리전 장애에도 도쿄 AMG에서 cross-region 조회 가능.
+            # sigv4에 accessKey/roleArn 미지정 → 기본 자격증명 체인이 위 SA의 IRSA 웹아이덴티티 토큰을 사용해 서명.
+            remoteWrite:
+              - url: https://aps-workspaces.ap-northeast-2.amazonaws.com/workspaces/ws-2f69639a-b9ad-4401-bdf1-b5914847b3e2/api/v1/remote_write
+                sigv4:
+                  region: ap-northeast-2
+                # 송신 큐 튜닝 — 일시적 부하·네트워크 지연 시 샘플 유실 방지(소규모 클러스터 보수값)
+                queueConfig:
+                  capacity: 2500
+                  maxSamplesPerSend: 1000
+                  maxShards: 200
         alertmanager:
           enabled: true
   destination:
