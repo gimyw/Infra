@@ -1,7 +1,7 @@
 # Phase 7 — 검수 에이전트(audit_agent) : promote 직후 split-brain을 '스스로 조사'하는 읽기전용 AI 에이전트
-# Bedrock Converse tool-use 루프(AgentCore 없이 Lambda 안에서). 도구는 전부 읽기전용 →
-# bedrock:InvokeModel + dynamodb:GetItem(좌표) + rds:DescribeDBInstances 만. VPC 불필요(공개 API·health만).
-# 분기(rule_verdict)는 핸들러의 결정론 _rule()이 정하고, AI는 조사·설명만 한다.
+# Bedrock Converse tool-use 루프(AgentCore 없이 Lambda 안에서). 도구 6종 전부 읽기전용 →
+# bedrock + dynamodb:GetItem(좌표) + rds:DescribeDBInstances + lambda:Invoke(verify=정합성 쿼리)
+# + cloudwatch:GetMetricStatistics(S3 복제). VPC 불필요. 분기는 핸들러 결정론 _rule()이, AI는 조사·설명만.
 data "archive_file" "audit_agent" {
   type        = "zip"
   source_dir  = "${path.module}/../../lambdas/audit_agent"
@@ -33,7 +33,17 @@ resource "aws_iam_role_policy" "audit_agent" {
       },
       {
         Effect   = "Allow"
-        Action   = ["rds:DescribeDBInstances"] # dr-rds(도쿄)·prod-rds(서울) 둘 다 읽기
+        Action   = ["rds:DescribeDBInstances"] # dr-rds(도쿄)·prod-rds(서울) 둘 다 읽기 + fence 실물 SG
+        Resource = "*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["lambda:InvokeFunction"] # verify를 check 모드로(정합성 쿼리)
+        Resource = aws_lambda_function.verify.arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["cloudwatch:GetMetricStatistics"] # S3 복제 지연(best-effort)
         Resource = "*"
       }
     ]
@@ -43,7 +53,7 @@ resource "aws_lambda_function" "audit_agent" {
   function_name    = "dr-brain-audit-agent"
   runtime          = "python3.12"
   handler          = "handler.handler"
-  timeout          = 120 # 도구 루프(최대 5턴) 여유
+  timeout          = 180 # 도구 루프(최대 10턴) 여유
   filename         = data.archive_file.audit_agent.output_path
   source_code_hash = data.archive_file.audit_agent.output_base64sha256
   role             = aws_iam_role.audit_agent.arn
@@ -54,6 +64,10 @@ resource "aws_lambda_function" "audit_agent" {
       SEOUL_HEALTH_URL  = var.seoul_health_url
       DR_RDS_ID         = "dr-rds"
       PROD_RDS_ID       = "prod-rds"
+      VERIFY_FUNCTION   = aws_lambda_function.verify.function_name
+      FENCE_SG_ID       = aws_security_group.fence.id
+      S3_SOURCE_BUCKET  = "farmily-s3-bucket"
+      S3_DEST_BUCKET    = "farmily-s3-bucket-dr"
     }
   }
 }
