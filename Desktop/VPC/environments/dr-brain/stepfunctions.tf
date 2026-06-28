@@ -32,13 +32,19 @@ resource "aws_iam_role_policy" "sfn" {
           aws_lambda_function.fence.arn,
           aws_lambda_function.promote.arn,
           aws_lambda_function.flip.arn,
-          aws_lambda_function.verify.arn
+          aws_lambda_function.verify.arn,
+          aws_lambda_function.audit_agent.arn # Phase 7
         ]
       },
       {
         Effect   = "Allow"
         Action   = ["rds:DescribeDBInstances"]
         Resource = "*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["sns:Publish"] # Phase 7 NotifyAndPage
+        Resource = aws_sns_topic.approvals.arn
       }
     ]
   })
@@ -92,7 +98,31 @@ resource "aws_sfn_state_machine" "failover" {
         ResultPath = "$.flip"
         Next       = "Verify"
       }
-      Verify      = { Type = "Task", Resource = aws_lambda_function.verify.arn, ResultPath = "$.verify", Next = "Done" }
+      Verify = { Type = "Task", Resource = aws_lambda_function.verify.arn, ResultPath = "$.verify", Next = "VerifyJudge" }
+      # Phase 7 — 검수 에이전트(읽기전용 조사) → 결정론 rule_verdict로 분기
+      VerifyJudge = {
+        Type       = "Task"
+        Resource   = aws_lambda_function.audit_agent.arn
+        Parameters = { "verify.$" = "$.verify" }
+        ResultPath = "$.audit"
+        Next       = "AuditGate"
+      }
+      AuditGate = {
+        Type    = "Choice"
+        Choices = [{ Variable = "$.audit.rule_verdict", StringEquals = "ok", Next = "Done" }]
+        Default = "NotifyAndPage" # 의심/분열이면 먼저 시끄럽게 알린다
+      }
+      NotifyAndPage = {
+        Type     = "Task"
+        Resource = "arn:aws:states:::sns:publish"
+        Parameters = {
+          TopicArn    = aws_sns_topic.approvals.arn
+          Subject     = "[DR] Failover 검수 — 사람 확인 필요"
+          "Message.$" = "$.audit.audit_ko"
+        }
+        ResultPath = "$.paged"
+        Next       = "Done" # dr-5(Retrospective) 추가 시 여기를 Retrospective로 재배선
+      }
       Done        = { Type = "Succeed" }
       DryRunDone  = { Type = "Succeed" }
       Rejected    = { Type = "Succeed" }

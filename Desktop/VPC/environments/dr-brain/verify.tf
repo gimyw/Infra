@@ -47,6 +47,8 @@ resource "aws_lambda_function" "verify" {
       PROMOTED_SECRET = aws_secretsmanager_secret.promoted.arn
       DB_SECRET       = "farmily/dr/app-infra"
       DB_APP_SECRET   = "farmily/dr/app" # 비번은 별도 시크릿(Phase 1 as-built과 동일)
+      # dr-7 확장: 핵심 테이블 행수 점검. 신뢰된 이름만(SQL 주입 방지). Backend V1 스키마 실재 테이블.
+      AUDIT_TABLES = "users,farm_diaries,subscriptions,payments"
     }
   }
   vpc_config {

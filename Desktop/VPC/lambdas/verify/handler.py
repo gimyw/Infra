@@ -1,7 +1,8 @@
-# lambdas/verify/handler.py  —  정말 됐는지 확인한다
-# 새 primary에 실제로 써보고(스모크), 더 이상 복구 모드가 아닌지 확인하고, 앱이 200을 주는지 본다.
+# lambdas/verify/handler.py  —  검수 baseline 신호를 모은다 (dr-7 확장)
+# 새 primary에 실제로 써보고(스모크), 복구 모드가 아닌지 확인하고, 앱 200·핵심 테이블 상태를 본다.
 # verify가 빨간불이어도 promote는 되돌리지 않는다 — 사실 확인이 목적이고, 실패는 숨기지 않고 알린다.
-# (정합성 신호 확장·split-brain 판정은 dr-7에서 이 파일을 넓힌다.)
+# 여기서 모은 신호를 audit_agent(검수 에이전트)가 받아 split-brain을 판정한다. (단일 writer 신호=좌표는
+# audit_agent가 직접 읽으므로 verify엔 안 넣는다 → VPC 람다가 DynamoDB까지 닿을 필요 없음.)
 #   접속 정보는 diagnose와 같은 3원천:
 #     PROMOTED_SECRET (farmily/dr/promoted-db) : DB_HOST, DB_PORT (flip이 기록한 새 쓰기 엔드포인트)
 #     DB_SECRET       (farmily/dr/app-infra)   : DB_USER(farmilyadmin), DB_NAME
@@ -21,8 +22,20 @@ def handler(event, _ctx):
         user=infra["DB_USER"], password=app["DB_PASSWORD"],
         database=infra.get("DB_NAME", "postgres"), ssl_context=True)
 
-    in_recovery = c.run("SELECT pg_is_in_recovery()")[0][0]      # promote 됐으면 False
-    c.run("CREATE TEMP TABLE _dr_smoke(x int); INSERT INTO _dr_smoke VALUES (1)")  # 쓰기 가능?
+    in_recovery = bool(c.run("SELECT pg_is_in_recovery()")[0][0])  # promote 됐으면 False
+    writable = True
+    try:
+        c.run("CREATE TEMP TABLE _dr_smoke(x int); INSERT INTO _dr_smoke VALUES (1)")  # 쓰기 가능?
+    except Exception:
+        writable = False
+
+    # 핵심 테이블 정합성 — AUDIT_TABLES는 운영자가 지정하는 신뢰된 이름만(사용자 입력 X, SQL 주입 방지)
+    audits = {}
+    for t in [x.strip() for x in os.environ.get("AUDIT_TABLES", "").split(",") if x.strip()]:
+        try:
+            audits[t] = {"rows": int(c.run(f"SELECT count(*) FROM {t}")[0][0])}
+        except Exception as e:
+            audits[t] = {"error": str(e)[:80]}
 
     health = False
     try:
@@ -31,4 +44,5 @@ def handler(event, _ctx):
     except Exception:
         pass
 
-    return {"writable": not in_recovery, "app_200": health}
+    return {"writable": writable and not in_recovery, "in_recovery": in_recovery,
+            "app_200": health, "audits": audits}

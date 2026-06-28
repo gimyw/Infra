@@ -6,6 +6,7 @@
 | 2 | detect_canary — 도쿄가 서울을 1분마다 probe → 좌표 기록 + SNS 알림(탐지·기록만, 전환 없음) | `coordinator.tf` · `canary.tf` · `eventbridge.tf` · `lambdas/detect_canary` | `eks-dr/guide/dr-2-detect-coordinator.md` |
 | 3 | Step Functions + Slack 승인 — 진단→AI분석→사람 승인 대기를 하나로 잇기(**promote 없는 dry-run**) | `slack.tf` · `function_url.tf` · `stepfunctions.tf` · `lambdas/{slack_notify,slack_callback}` | `eks-dr/guide/dr-3-stepfunctions-slack.md` |
 | 4 | fence·promote·flip·verify — 승인 뒤 **진짜 비가역 동작**(arm_promote 게이트) + FIS 게임데이 | `fence.tf` · `promote.tf` · `flip.tf` · `verify.tf` · `stepfunctions.tf` · `lambdas/{fence,promote,flip_coordinator,verify}` | `eks-dr/guide/dr-4-fence-promote-fis.md` |
+| 7 | **검수 에이전트** — promote 직후 split-brain을 읽기전용 도구로 **스스로 조사**하는 AI 에이전트(DIY Converse tool-use) | `audit_agent.tf` · `verify.tf`(확장) · `stepfunctions.tf` · `lambdas/audit_agent` | `eks-dr/guide/dr-7-failover-audit.md` |
 
 ---
 
@@ -244,3 +245,45 @@ aws fis start-experiment --experiment-template-id EXTXoynPL9KzRpt --region ap-no
 - `terraform fmt` 무변경(스타일 일치), `terraform validate` → **Success**
 - 가이드 `dr-4` 코드 그대로 이식 + as-built 보정 3가지(위). `lambda_assume`·`aws.seoul` provider·`aws_iam_role.sfn` 재사용
 - `stepfunctions.tf`는 Phase 3 파일을 교체(상태기계·정책 in-place) — 신규 리소스는 fence/promote/flip/verify 일습
+
+---
+
+## Phase 7 (검수 에이전트 — promote 직후 split-brain을 스스로 조사하는 AI 에이전트)
+
+dr-7의 단발 verify_advisor를 **진짜 에이전트**로 올렸다. promote 직후, **읽기전용 도구를 스스로 골라가며 조사**한 뒤
+split-brain 위험을 한국어로 판정한다. 단발 호출(워크플로우)이 아니라 **도구를 골라 도는 루프**라서 에이전트다.
+**AgentCore 없이** Lambda 안에서 Bedrock Converse `tool-use` 루프로 구현. 가이드: `eks-infra/eks-dr/guide/dr-7-failover-audit.md`
+
+### 추가/변경된 자산
+- `lambdas/audit_agent/handler.py` — **검수 에이전트**(비-VPC, 표준 라이브러리). 읽기전용 도구 3개:
+  `reprobe_seoul`(서울 재-probe)·`describe_rds`(dr-rds/prod-rds 상태)·`get_coordinator`(단일 writer). Converse 루프(최대 5턴).
+- `audit_agent.tf` — 에이전트 람다 + IAM(`bedrock:InvokeModel`·`dynamodb:GetItem`·`rds:DescribeDBInstances`).
+- `lambdas/verify/handler.py`(확장) — baseline 신호에 `in_recovery`·`audits{테이블:행수}` 추가(`AUDIT_TABLES`).
+- `stepfunctions.tf` — `Verify → VerifyJudge(에이전트) → AuditGate → ok=Done / else=NotifyAndPage(SNS)→Done`.
+
+### ★ 왜 '에이전트'이고 어디까지 안전한가
+- **AI가 스스로 조사**: baseline만 받고 끝나는 게 아니라, *"서울을 다시 찔러봐야겠다 / RDS 상태를 보자"* 처럼
+  **도구를 직접 골라 반복 조사**한 뒤 판정한다(자율 제어 루프 = 에이전트).
+- **분기는 AI가 아니라 결정론적 Rule**: `rule_verdict`(ok/suspect/danger)는 핸들러의 `_rule()`이 baseline+좌표로
+  계산한다. AI가 말을 바꾸거나 죽어도(`ai_unavailable`) **분기는 안 흔들린다**. AI는 조사·설명·권고만.
+- **모든 도구 읽기전용**: promote·fence·복구 등 행동은 일절 안 한다. 비가역 동작 *뒤* + 비차단이라 안전.
+
+### as-built / 결정
+- `AUDIT_TABLES = "users,farm_diaries,subscriptions,payments"` — Backend V1 스키마 실재 핵심 테이블(신뢰 이름만, SQL 주입 방지).
+- 좌표(단일 writer 신호)는 verify(VPC)가 아니라 **에이전트(비-VPC)가 직접** 읽음 → VPC 람다가 DynamoDB까지 닿을 필요 없음.
+- dr-5(Retrospective) 미구현 → AuditGate/NotifyAndPage의 `Next=Done`. dr-5 추가 시 `Retrospective`로 재배선.
+- 깊은 DB 포렌식(최신 레코드·시퀀스 연속성)은 VPC db-tool 람다 필요 → v2 후속.
+
+### 검증 (apply 후)
+```bash
+# 에이전트를 합성 baseline(split-brain 의심 시나리오)으로 직접 호출 → 도구 루프가 도는지 + 판정 확인
+aws lambda invoke --function-name dr-brain-audit-agent --region ap-northeast-1 \
+  --payload '{"verify":{"writable":true,"in_recovery":false,"app_200":true,"audits":{}}}' \
+  --cli-binary-format raw-in-base64-out a.json && cat a.json
+# 기대: rule_verdict(좌표 기준)·tools_used(reprobe_seoul/describe_rds 등)·audit_ko(한국어 판정)
+```
+
+## 검증 완료 (Claude) — Phase 7
+- `terraform fmt` 무변경, `terraform validate` → **Success**
+- DIY Bedrock Converse tool-use 루프(AgentCore 미사용). `lambda_assume`·`coordinator`·`approvals`·`var.*` 재사용
+- 분기=결정론 Rule, AI=조사·설명. 모든 도구 읽기전용 → advisory 원칙 유지
