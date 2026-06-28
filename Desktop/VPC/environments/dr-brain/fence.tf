@@ -12,7 +12,7 @@ data "aws_vpc" "prod_seoul" {
 resource "aws_security_group" "fence" {
   provider    = aws.seoul
   name        = "dr-brain-fence-sg"
-  description = "DR fence — empty SG to cut writes to old Seoul primary"
+  description = "DR fence - empty SG to cut writes to old Seoul primary"
   vpc_id      = data.aws_vpc.prod_seoul.id
 
   tags = { Name = "dr-brain-fence-sg" }
