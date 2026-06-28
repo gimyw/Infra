@@ -4,6 +4,7 @@
 |---|---|---|---|
 | 1 | diagnose + advisor — 복제 상태 읽어 한국어 판단(읽기 전용) | `lambdas.tf` · `lambdas/{diagnose,advisor}` | `eks-dr/guide/dr-1-advisor-ai.md` |
 | 2 | detect_canary — 도쿄가 서울을 1분마다 probe → 좌표 기록 + SNS 알림(탐지·기록만, 전환 없음) | `coordinator.tf` · `canary.tf` · `eventbridge.tf` · `lambdas/detect_canary` | `eks-dr/guide/dr-2-detect-coordinator.md` |
+| 3 | Step Functions + Slack 승인 — 진단→AI분석→사람 승인 대기를 하나로 잇기(**promote 없는 dry-run**) | `slack.tf` · `function_url.tf` · `stepfunctions.tf` · `lambdas/{slack_notify,slack_callback}` | `eks-dr/guide/dr-3-stepfunctions-slack.md` |
 
 ---
 
@@ -111,3 +112,68 @@ aws dynamodb get-item --region ap-northeast-1 --table-name dr-brain-coordinator 
 - `terraform fmt` 무변경(스타일 일치), `terraform validate` → **Success**
 - 가이드 `dr-2` 코드 그대로 이식. 단 placeholder 였던 `SEOUL_HEALTH_URL` 은 `var.seoul_health_url` 로 빼 `tfvars` 한 곳에서 채우게 함(+ `route53_hc_id` 선택 변수)
 - `lambda_assume`(iam.tf) 재사용 — canary 는 VPC 밖, SG/네트워크 변경 없음 → Phase 1 의 `dr-rds-sg` drift 위험과 무관
+
+---
+
+## Phase 3 (Step Functions + Slack 승인 — promote 없는 dry-run)
+
+지금까지의 조각(`diagnose`·`advisor`)을 **Step Functions** 하나로 꿰고, 그 중간에 **사람 승인 게이트**를 넣는다.
+워크플로우가 Slack 카드를 띄우고 `waitForTaskToken`으로 **멈춰 기다리다가**, 누군가 [승인]을 누르면 그 지점부터 재개한다.
+단 이번 단계는 **promote를 걸지 않는 dry-run** — [승인]을 눌러도 `WouldFence`(Succeed)로만 끝난다. 흐름·승인 배관을 먼저 단단히.
+가이드: `eks-infra/eks-dr/guide/dr-3-stepfunctions-slack.md`
+
+### 추가된 자산
+- `lambdas/slack_notify/handler.py` — taskToken+한국어 판단을 받아 [승인]/[거부] 카드 게시. 토큰은 짧은 id로 `dr-brain-tasktokens`에 보관
+- `lambdas/slack_callback/handler.py` — 버튼 클릭 수신, **서명검증**(HMAC·5분 재전송 방지) → `SendTaskSuccess`로 흐름 재개
+- `slack.tf` — `dr-brain-tasktokens` 테이블 + slack 두 Lambda + IAM(dr-1의 `lambda_assume` 재사용, 둘 다 VPC 밖)
+- `function_url.tf` — `slack_callback`에 공개 Function URL(AuthType NONE) + 호출 권한 + `output slack_callback_url`
+- `stepfunctions.tf` — `dr-brain-failover` 상태기계: `Diagnose → AIAnalyze → PostApproval(waitForTaskToken) → Decide → WouldFence/Rejected`
+
+### ★ 적용 전 — Slack 앱 만들기 (콘솔 예외, ~15분)
+Slack 앱은 AWS 리소스가 아니라 Terraform 대상이 아니다(Bedrock 모델 액세스와 함께 콘솔로 하는 단 둘 중 하나).
+**워크스페이스 앱 설치 권한**이 필요하다 — 없으면 권한 가진 팀원에게 요청한다.
+
+1. <https://api.slack.com/apps> ▸ Create New App ▸ From scratch (이름 `DR Failover Bot`)
+2. OAuth & Permissions ▸ Bot Token Scopes에 `chat:write` ▸ Install to Workspace ▸ **Bot User OAuth Token**(`xoxb-…`) 복사
+3. Basic Information ▸ **Signing Secret** 복사
+4. 알림 채널(예: `#dr-alerts`)에 봇 초대 (`/invite @DR Failover Bot`)
+5. (apply 후) Interactivity & Shortcuts ▸ 켜고 Request URL에 **`slack_callback_url`** 붙여넣기
+6. 세 값을 시크릿에 저장(IAM은 `farmily/dr/slack-*` 와일드카드라 이 시크릿이 없어도 apply는 통과):
+
+```bash
+aws secretsmanager create-secret --region ap-northeast-1 --name farmily/dr/slack \
+  --secret-string '{"bot_token":"xoxb-...","signing_secret":"...","channel":"#dr-alerts"}'
+```
+
+> ⚠️ Signing Secret을 코드에 박지 말 것 — 노출되면 누구나 가짜 "승인"을 보낼 수 있다(Phase 4부터 치명적).
+
+### 적용
+
+```bash
+cd environments/dr-brain
+terraform plan     # ★ 검수: "X to add, 0 to change, 0 to destroy" (Phase 1·2·dr/prod 무변경)
+terraform apply
+terraform output slack_callback_url   # ← 이 URL을 위 5번(Slack Interactivity)에 채운다
+```
+
+### 검증 (apply + Slack 시크릿 등록 후)
+
+```bash
+# dry-run 실행 시작(빈 입력) → Slack에 [승인]/[거부] 카드가 떠야 함
+aws stepfunctions start-execution --region ap-northeast-1 \
+  --state-machine-arn $(aws stepfunctions list-state-machines --region ap-northeast-1 \
+    --query "stateMachines[?name=='dr-brain-failover'].stateMachineArn" --output text) \
+  --input '{}'
+```
+- [승인] → 멈춘 실행이 `WouldFence`로 재개·성공. [거부] → `Rejected`. 15분 무응답 → `TimeoutSeconds`로 종료.
+- 가짜 서명으로 Function URL을 호출하면 401.
+- 클릭 후 `dr-brain-tasktokens`에서 해당 항목이 삭제되는지 확인.
+
+> 참고: 이번 Phase 3는 **실행을 사람이 수동 start** 한다(dry-run을 반복해 토큰 왕복·서명·타임아웃을 다지는 게 목적).
+> 탐지(canary/SNS) → Step Functions 자동 발동 배선은 Phase 4에서 promote와 함께 붙인다.
+
+## 검증 완료 (Claude) — Phase 3
+- `terraform fmt` 무변경(스타일 일치), `terraform validate` → **Success**
+- 가이드 `dr-3` 코드 그대로 이식. 단 `slack_callback`에 **Function URL base64 본문 처리 1줄**(`isBase64Encoded`) 추가 — 서명검증·parse 이전에 raw로 되돌림
+- `lambda_assume`(iam.tf)·`data.aws_caller_identity.me`(data.tf) 재사용. slack 두 Lambda는 VPC 밖 → SG drift 무관
+- 변수 추가 없음(slack 시크릿명·채널은 시크릿 JSON 내부) → `variables.tf`·`terraform.tfvars` 무변경
