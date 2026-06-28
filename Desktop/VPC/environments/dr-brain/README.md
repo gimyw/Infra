@@ -7,6 +7,7 @@
 | 3 | Step Functions + Slack 승인 — 진단→AI분석→사람 승인 대기를 하나로 잇기(**promote 없는 dry-run**) | `slack.tf` · `function_url.tf` · `stepfunctions.tf` · `lambdas/{slack_notify,slack_callback}` | `eks-dr/guide/dr-3-stepfunctions-slack.md` |
 | 4 | fence·promote·flip·verify — 승인 뒤 **진짜 비가역 동작**(arm_promote 게이트) + FIS 게임데이 | `fence.tf` · `promote.tf` · `flip.tf` · `verify.tf` · `stepfunctions.tf` · `lambdas/{fence,promote,flip_coordinator,verify}` | `eks-dr/guide/dr-4-fence-promote-fis.md` |
 | 7 | **검수 에이전트** — promote 직후 split-brain을 읽기전용 도구로 **스스로 조사**하는 AI 에이전트(DIY Converse tool-use) | `audit_agent.tf` · `verify.tf`(확장) · `stepfunctions.tf` · `lambdas/audit_agent` | `eks-dr/guide/dr-7-failover-audit.md` |
+| 5 | 회고 — 실행 히스토리 → 실측 RTO/RPO 한국어 보고서 → S3(어느 경로든 마지막에 남김) | `retrospective.tf` · `stepfunctions.tf` · `lambdas/retrospective` | `eks-dr/guide/dr-5-retrospective.md` |
 
 ---
 
@@ -287,3 +288,41 @@ aws lambda invoke --function-name dr-brain-audit-agent --region ap-northeast-1 \
 - `terraform fmt` 무변경, `terraform validate` → **Success**
 - DIY Bedrock Converse tool-use 루프(AgentCore 미사용). `lambda_assume`·`coordinator`·`approvals`·`var.*` 재사용
 - 분기=결정론 Rule, AI=조사·설명. 모든 도구 읽기전용 → advisory 원칙 유지
+
+---
+
+## Phase 5 (회고 — 실측 RTO/RPO를 AI가 한국어로)
+
+failover가 끝나면 마지막에 **실측 RTO/RPO 회고 보고서**를 자동으로 남긴다. Step Functions가 단계마다 자동으로 찍은
+타임스탬프(실행 히스토리)를 읽어 단계별 소요·총 RTO를 계산하고, Bedrock이 한국어로 정리해 S3에 쌓는다.
+가이드: `eks-infra/eks-dr/guide/dr-5-retrospective.md`
+
+### 추가/변경된 자산
+- `lambdas/retrospective/handler.py` — 실행 히스토리(상태 진입 시각) + diagnose 복제지연(RPO 하한) + audit 판정을
+  Bedrock에 넘겨 한국어 회고를 만들고 S3에 저장. 표준 라이브러리만(VPC·의존성 불필요). AI 죽어도 raw 타임라인은 남김.
+- `retrospective.tf` — 전용 버킷 `dr-brain-retro-<account>`(공개차단) + 람다 + IAM(`states:GetExecutionHistory`·
+  `bedrock:InvokeModel`·`s3:PutObject`).
+- `stepfunctions.tf` 재배선 — `AuditGate(ok)`·`NotifyAndPage`를 `Done`→**`Retrospective`→`Done`**. 검수 결과가
+  안전이든 의심이든 **어느 경로로 끝나도 회고는 남는다**. sfn 역할에 retrospective invoke 추가.
+
+### 왜 거의 공짜인가
+- 상태기계는 모든 상태 전환마다 타임스탬프를 히스토리에 자동으로 남긴다. 따로 계측 코드를 안 심어도 각 단계가 몇 초
+  걸렸는지 그대로 나온다. 회고 람다는 히스토리를 읽어 AI에게 넘기기만 한다.
+- 가이드보다 enrich: 타임라인(RTO)에 더해 diagnose 복제지연(RPO 하한)·audit 판정을 같이 넘겨 보고서가 더 충실하다.
+
+### 검증 (apply 후)
+```bash
+# 실행 ARN 확보(기존 실행 없으면 start-execution — Slack 미설정이라 PostApproval에서 실패하지만 부분 히스토리는 남음, 무해)
+ARN=$(aws stepfunctions list-executions --region ap-northeast-1 \
+  --state-machine-arn $(aws stepfunctions list-state-machines --region ap-northeast-1 \
+    --query "stateMachines[?name=='dr-brain-failover'].stateMachineArn" --output text) \
+  --max-items 1 --query "executions[0].executionArn" --output text)
+aws lambda invoke --function-name dr-brain-retrospective --region ap-northeast-1 \
+  --payload "{\"executionArn\":\"$ARN\"}" --cli-binary-format raw-in-base64-out retro.json && cat retro.json
+# 기대: report_ko(한국어 회고) + S3 dr-retro/<id>.md 적재(saved:true)
+```
+
+## 검증 완료 (Claude) — Phase 5
+- `terraform fmt` 무변경, `terraform validate` → **Success**
+- 단발형 회고(에이전트 아님 — 타임라인 읽어 요약이라 조건분기 없음). `lambda_assume`·`var.bedrock_model_id`·`data.aws_caller_identity` 재사용
+- 상태기계 재배선(AuditGate/NotifyAndPage→Retrospective→Done)은 in-place change. 후속: RCA 회고 에이전트화(로그 적응형)

@@ -33,7 +33,8 @@ resource "aws_iam_role_policy" "sfn" {
           aws_lambda_function.promote.arn,
           aws_lambda_function.flip.arn,
           aws_lambda_function.verify.arn,
-          aws_lambda_function.audit_agent.arn # Phase 7
+          aws_lambda_function.audit_agent.arn,  # Phase 7
+          aws_lambda_function.retrospective.arn # Phase 5
         ]
       },
       {
@@ -109,7 +110,7 @@ resource "aws_sfn_state_machine" "failover" {
       }
       AuditGate = {
         Type    = "Choice"
-        Choices = [{ Variable = "$.audit.rule_verdict", StringEquals = "ok", Next = "Done" }]
+        Choices = [{ Variable = "$.audit.rule_verdict", StringEquals = "ok", Next = "Retrospective" }]
         Default = "NotifyAndPage" # 의심/분열이면 먼저 시끄럽게 알린다
       }
       NotifyAndPage = {
@@ -121,7 +122,19 @@ resource "aws_sfn_state_machine" "failover" {
           "Message.$" = "$.audit.audit_ko"
         }
         ResultPath = "$.paged"
-        Next       = "Done" # dr-5(Retrospective) 추가 시 여기를 Retrospective로 재배선
+        Next       = "Retrospective" # 알린 뒤에도 회고는 남긴다
+      }
+      # Phase 5 — 어느 경로든 마지막에 회고를 남긴다(실측 RTO/RPO)
+      Retrospective = {
+        Type     = "Task"
+        Resource = aws_lambda_function.retrospective.arn
+        Parameters = {
+          "executionArn.$" = "$$.Execution.Id"
+          "diagnose.$"     = "$.diagnose"
+          "audit.$"        = "$.audit"
+        }
+        ResultPath = "$.retro"
+        Next       = "Done"
       }
       Done        = { Type = "Succeed" }
       DryRunDone  = { Type = "Succeed" }
