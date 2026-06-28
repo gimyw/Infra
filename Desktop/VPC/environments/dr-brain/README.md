@@ -5,6 +5,7 @@
 | 1 | diagnose + advisor — 복제 상태 읽어 한국어 판단(읽기 전용) | `lambdas.tf` · `lambdas/{diagnose,advisor}` | `eks-dr/guide/dr-1-advisor-ai.md` |
 | 2 | detect_canary — 도쿄가 서울을 1분마다 probe → 좌표 기록 + SNS 알림(탐지·기록만, 전환 없음) | `coordinator.tf` · `canary.tf` · `eventbridge.tf` · `lambdas/detect_canary` | `eks-dr/guide/dr-2-detect-coordinator.md` |
 | 3 | Step Functions + Slack 승인 — 진단→AI분석→사람 승인 대기를 하나로 잇기(**promote 없는 dry-run**) | `slack.tf` · `function_url.tf` · `stepfunctions.tf` · `lambdas/{slack_notify,slack_callback}` | `eks-dr/guide/dr-3-stepfunctions-slack.md` |
+| 4 | fence·promote·flip·verify — 승인 뒤 **진짜 비가역 동작**(arm_promote 게이트) + FIS 게임데이 | `fence.tf` · `promote.tf` · `flip.tf` · `verify.tf` · `stepfunctions.tf` · `lambdas/{fence,promote,flip_coordinator,verify}` | `eks-dr/guide/dr-4-fence-promote-fis.md` |
 
 ---
 
@@ -177,3 +178,69 @@ aws stepfunctions start-execution --region ap-northeast-1 \
 - 가이드 `dr-3` 코드 그대로 이식. 단 `slack_callback`에 **Function URL base64 본문 처리 1줄**(`isBase64Encoded`) 추가 — 서명검증·parse 이전에 raw로 되돌림
 - `lambda_assume`(iam.tf)·`data.aws_caller_identity.me`(data.tf) 재사용. slack 두 Lambda는 VPC 밖 → SG drift 무관
 - 변수 추가 없음(slack 시크릿명·채널은 시크릿 JSON 내부) → `variables.tf`·`terraform.tfvars` 무변경
+
+---
+
+## Phase 4 (fence · promote · flip · verify — 진짜 비가역 동작 + FIS)
+
+Phase 3의 `WouldFence`(빈 자리)를 실제 체인으로 채운다 — 구 서울 차단(**fence**) → 도쿄 승격(**promote**) →
+좌표 전환(**flip**) → 검증(**verify**). 되돌릴 수 없는 단계라, 모든 위험 동작을 입력 플래그 **`arm_promote`** 뒤에 둔다.
+가이드: `eks-infra/eks-dr/guide/dr-4-fence-promote-fis.md`
+
+### 추가된 자산
+- `lambdas/fence/handler.py` — epoch CAS 잠금 → 서울 닿으면 `prod-rds` SG를 빈 `dr-brain-fence-sg`로 원자 교체. 못 닿으면 `fence_pending`(서울 복귀 시 재시도).
+- `lambdas/promote/handler.py` — `dr-rds` promote_read_replica **시작만**(완료대기는 SFN 폴링).
+- `lambdas/flip_coordinator/handler.py` — 좌표 `current_primary=tokyo`(epoch 소유 확인) + `farmily/dr/promoted-db` 시크릿에 새 엔드포인트.
+- `lambdas/verify/handler.py` — 새 primary 쓰기 스모크 + `pg_is_in_recovery()` + 앱 200. **pg8000 의존**(diagnose처럼 벤더링).
+- `fence.tf`(서울 prod VPC 참조 + 빈 fence-sg) · `promote.tf` · `flip.tf` · `verify.tf`(VPC 안) + `stepfunctions.tf` 교체.
+
+### ★ 게임데이 안전핀 — `arm_promote`
+- 상태기계 입력의 기본은 **`{"arm_promote": false}`**. 이 값이 false면 fence·promote가 **실제로는 아무것도 안 하고 로그만** 남기고 `DryRunDone`으로 끝난다.
+- 진짜로 승격하려는, 신중히 결정한 단 한 번만 `true`로 넣는다. **진짜 `dr-rds`는 게임데이에서 promote 금지** — 풀 드릴은 버려도 되는 throwaway RDS로만(D6).
+- `apply` 자체는 아무것도 fence/promote하지 않는다(리소스 정의만 추가).
+
+### as-built 보정 (가이드와 의도적으로 다름)
+- **서울 비번 로테이션 생략**(`SEOUL_DB_SECRET=""`) — 실제 서울 비번은 공유 시크릿 `farmily/prod/app`(JWT 등 다수 포함)뿐 + 로테이션 람다 없음. 공유 시크릿 로테이션은 위험 → **차단은 SG 교체만**(RotateSecret 권한도 미부여).
+- **flip 파드 재시작 = TODO no-op** — 레포에 SSM/EKS 롤아웃 자동화가 아직 없음(greenfield). 좌표+시크릿 갱신까지만 하고, 읽기전용 해제는 후속(`ssm:SendCommand` 권한도 미부여).
+- `verify`는 3-시크릿 접속(promoted=host/port · app-infra=user/name · app=password) — Phase 1 as-built과 동일.
+
+### 적용 전 — 사전 준비
+```bash
+# verify 의존성(pg8000) 벤더링 — diagnose와 동일(미설치 시 zip에 모듈 누락)
+pip install pg8000 -t lambdas/verify/
+```
+
+### 적용
+```bash
+cd environments/dr-brain
+terraform plan     # ★ 검수: 신규 add + stepfunctions.tf(상태기계·정책) in-place change + 0 destroy
+                   #   (Phase 3 placeholder를 실 체인으로 바꾸는 거라 state machine 1건 change는 정상)
+terraform apply
+```
+
+### 검증 (apply 후)
+```bash
+# dry-run — fence·promote가 no-op으로 끝까지 흐르는지 (DryRunDone 도달)
+aws stepfunctions start-execution --region ap-northeast-1 \
+  --state-machine-arn $(aws stepfunctions list-state-machines --region ap-northeast-1 \
+    --query "stateMachines[?name=='dr-brain-failover'].stateMachineArn" --output text) \
+  --input '{"arm_promote": false}'
+```
+- [승인] → fence·promote no-op → `DryRunDone`으로 성공. fence 실패 주입 시 `FenceFailed`로 멈추고 **promote 미호출**.
+- 진짜 promote 드릴은 **throwaway RDS**로만 `arm_promote=true`.
+
+### FIS 게임데이 런북 (서울 리전 격리)
+계정에 템플릿 **`Seoul-Region-Network-Disruption`**(`EXTXoynPL9KzRpt`, 서울 private 서브넷 2개, `PT15M`)이 이미 있다.
+```bash
+aws fis get-experiment-template --id EXTXoynPL9KzRpt --region ap-northeast-2   # 먼저 정의 확인
+# ★ 상태기계 입력이 arm_promote=false 인지 반드시 먼저 확인 후:
+aws fis start-experiment --experiment-template-id EXTXoynPL9KzRpt --region ap-northeast-2
+```
+> ⚠️ **15분 뒤 자동복구 ↔ auto-failback**: 이 템플릿은 15분 뒤 연결을 복구해 Route53이 트래픽을 서울로 되돌린다.
+> 드릴(`arm_promote=false`)에선 안전(도쿄 미승격). **진짜 promote까지 했다면** 복귀한 서울이 다시 쓰기를 받아 split-brain →
+> 서울 자동복귀를 막아야 함. 비상 정지: `aws fis stop-experiment --id <실행ID>`.
+
+## 검증 완료 (Claude) — Phase 4
+- `terraform fmt` 무변경(스타일 일치), `terraform validate` → **Success**
+- 가이드 `dr-4` 코드 그대로 이식 + as-built 보정 3가지(위). `lambda_assume`·`aws.seoul` provider·`aws_iam_role.sfn` 재사용
+- `stepfunctions.tf`는 Phase 3 파일을 교체(상태기계·정책 in-place) — 신규 리소스는 fence/promote/flip/verify 일습

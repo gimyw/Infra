@@ -1,6 +1,7 @@
-# Phase 3 — 전부 잇기 : 상태기계 (promote 없는 dry-run)
-# 지금까지의 조각을 하나로 꿴다: 진단 → AI 분석 → 사람 승인 대기(waitForTaskToken).
-# 승인되면 WouldFence(Succeed)로만 끝난다 — 실제 fence/promote는 Phase 4에서 붙인다.
+# Phase 4 — 전부 잇기 : 상태기계 (arm_promote로 비가역 동작을 게이트)
+# Phase 3의 WouldFence(빈 자리)를 실제 Fence → Promote → (완료 폴링) → Flip → Verify로 교체.
+# 모든 위험 동작은 입력 플래그 arm_promote 뒤에 둔다 — 기본 false면 fence·promote가 no-op(로그만).
+# promote 완료 대기는 별도 람다 없이 Step Functions의 AWS-SDK 통합(describeDBInstances)으로 폴링.
 
 data "aws_iam_policy_document" "sfn_assume" {
   statement {
@@ -20,15 +21,26 @@ resource "aws_iam_role_policy" "sfn" {
   role = aws_iam_role.sfn.id
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = ["lambda:InvokeFunction"]
-      Resource = [
-        aws_lambda_function.diagnose.arn,
-        aws_lambda_function.advisor.arn,
-        aws_lambda_function.slack_notify.arn
-      ]
-    }]
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = ["lambda:InvokeFunction"]
+        Resource = [
+          aws_lambda_function.diagnose.arn,
+          aws_lambda_function.advisor.arn,
+          aws_lambda_function.slack_notify.arn,
+          aws_lambda_function.fence.arn,
+          aws_lambda_function.promote.arn,
+          aws_lambda_function.flip.arn,
+          aws_lambda_function.verify.arn
+        ]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["rds:DescribeDBInstances"]
+        Resource = "*"
+      }
+    ]
   })
 }
 
@@ -36,47 +48,55 @@ resource "aws_sfn_state_machine" "failover" {
   name     = "dr-brain-failover"
   role_arn = aws_iam_role.sfn.arn
   definition = jsonencode({
-    Comment = "DR failover — Phase 3 dry-run (promote 없음)"
+    Comment = "DR failover — 최종(arm_promote로 비가역 동작 게이트)"
     StartAt = "Diagnose"
     States = {
-      Diagnose = {
-        Type       = "Task"
-        Resource   = aws_lambda_function.diagnose.arn
-        ResultPath = "$.diagnose"
-        Next       = "AIAnalyze"
-      }
-      AIAnalyze = {
-        Type       = "Task"
-        Resource   = aws_lambda_function.advisor.arn
-        Parameters = { "diagnose.$" = "$.diagnose" }
-        ResultPath = "$.advisor"
-        Next       = "PostApproval"
-      }
+      Diagnose  = { Type = "Task", Resource = aws_lambda_function.diagnose.arn, ResultPath = "$.diagnose", Next = "AIAnalyze" }
+      AIAnalyze = { Type = "Task", Resource = aws_lambda_function.advisor.arn, Parameters = { "diagnose.$" = "$.diagnose" }, ResultPath = "$.advisor", Next = "PostApproval" }
       PostApproval = {
         Type     = "Task"
         Resource = "arn:aws:states:::lambda:invoke.waitForTaskToken"
         Parameters = {
           FunctionName = aws_lambda_function.slack_notify.arn
-          Payload = {
-            "taskToken.$" = "$$.Task.Token"
-            "advice_ko.$" = "$.advisor.advice_ko"
-          }
+          Payload      = { "taskToken.$" = "$$.Task.Token", "advice_ko.$" = "$.advisor.advice_ko" }
         }
-        TimeoutSeconds = 900 # 15분 무응답이면 실행 종료
+        TimeoutSeconds = 900
         ResultPath     = "$.approval"
         Next           = "Decide"
       }
-      Decide = {
-        Type = "Choice"
-        Choices = [{
-          Variable      = "$.approval.approved"
-          BooleanEquals = true
-          Next          = "WouldFence"
-        }]
-        Default = "Rejected"
+      Decide      = { Type = "Choice", Choices = [{ Variable = "$.approval.approved", BooleanEquals = true, Next = "Fence" }], Default = "Rejected" }
+      Fence       = { Type = "Task", Resource = aws_lambda_function.fence.arn, Parameters = { "arm_promote.$" = "$.arm_promote" }, ResultPath = "$.fence", Next = "ArmGate" }
+      ArmGate     = { Type = "Choice", Choices = [{ Variable = "$.arm_promote", BooleanEquals = true, Next = "FenceOk" }], Default = "DryRunDone" }
+      FenceOk     = { Type = "Choice", Choices = [{ Variable = "$.fence.fenced", BooleanEquals = true, Next = "Promote" }], Default = "FenceFailed" }
+      Promote     = { Type = "Task", Resource = aws_lambda_function.promote.arn, Parameters = { "arm_promote.$" = "$.arm_promote" }, ResultPath = "$.promote", Next = "WaitPromote" }
+      WaitPromote = { Type = "Wait", Seconds = 30, Next = "DescribePromote" }
+      DescribePromote = {
+        Type       = "Task"
+        Resource   = "arn:aws:states:::aws-sdk:rds:describeDBInstances"
+        Parameters = { DbInstanceIdentifier = "dr-rds" }
+        ResultPath = "$.desc"
+        Next       = "PromoteReady"
       }
-      WouldFence = { Type = "Succeed" } # Phase 4에서 여기에 fence→promote→flip을 붙인다
-      Rejected   = { Type = "Succeed" }
+      PromoteReady = {
+        Type    = "Choice"
+        Choices = [{ Variable = "$.desc.DbInstances[0].DbInstanceStatus", StringEquals = "available", Next = "Flip" }]
+        Default = "WaitPromote"
+      }
+      Flip = {
+        Type     = "Task"
+        Resource = aws_lambda_function.flip.arn
+        Parameters = {
+          promote = { "endpoint.$" = "$.desc.DbInstances[0].Endpoint.Address" }
+          fence   = { "epoch.$" = "$.fence.epoch" }
+        }
+        ResultPath = "$.flip"
+        Next       = "Verify"
+      }
+      Verify      = { Type = "Task", Resource = aws_lambda_function.verify.arn, ResultPath = "$.verify", Next = "Done" }
+      Done        = { Type = "Succeed" }
+      DryRunDone  = { Type = "Succeed" }
+      Rejected    = { Type = "Succeed" }
+      FenceFailed = { Type = "Fail", Error = "FenceFailed" }
     }
   })
 }
