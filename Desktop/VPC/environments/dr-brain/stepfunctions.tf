@@ -65,7 +65,7 @@ resource "aws_sfn_state_machine" "failover" {
         Resource = "arn:aws:states:::lambda:invoke.waitForTaskToken"
         Parameters = {
           FunctionName = aws_lambda_function.slack_notify.arn
-          Payload      = { "taskToken.$" = "$$.Task.Token", "advice_ko.$" = "$.advisor.advice_ko" }
+          Payload      = { "taskToken.$" = "$$.Task.Token", "advice_ko.$" = "$.advisor.advice_ko", "arm_promote.$" = "$.arm_promote" }
         }
         TimeoutSeconds = 900
         ResultPath     = "$.approval"
