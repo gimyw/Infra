@@ -1,0 +1,10 @@
+apiVersion: telemetry.istio.io/v1
+kind: Telemetry
+metadata:
+  name: mesh-tracing
+  namespace: istio-system #루트 메쉬, 즉 메시 전역에서 허용한다.
+spec:
+  tracing:
+    - providers:
+      - name: jaeger-otel
+      randomSamplingPercentage: 100 # 운영환경이면 1~5로 해야함

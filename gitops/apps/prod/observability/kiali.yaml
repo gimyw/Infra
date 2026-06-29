@@ -18,7 +18,10 @@ spec:
           prometheus:
             url: http://kube-prometheus-stack-prometheus.monitoring:9090   # ← 확인된 주소
           tracing:
-            enabled: false               # Jaeger/Tempo 는 방법 A 트랙에서 나중에 → 지금 끔
+            enabled: true               # Jaeger 사용
+            provider: jaeger
+            internal_url: http://jaeger-query.istio-system:16686 # 클러스터 내부에서 Kiali가 Jaeger에 질의하는 주소
+            use_grpc: false
   destination:
     server: https://kubernetes.default.svc
     namespace: istio-system
