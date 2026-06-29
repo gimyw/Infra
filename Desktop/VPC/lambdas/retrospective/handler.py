@@ -93,7 +93,7 @@ def handler(event, _ctx):
         r = boto3.client("bedrock-runtime", region_name=REGION).converse(
             modelId=os.environ["MODEL_ID"],
             messages=[{"role": "user", "content": [{"text": prompt}]}],
-            inferenceConfig={"maxTokens": 1500, "temperature": 0.3})
+            inferenceConfig={"maxTokens": 4000, "temperature": 0.3})
         report = r["output"]["message"]["content"][0]["text"]
     except Exception as e:
         # AI가 죽어도 raw 타임라인은 남긴다(회고의 원재료)
