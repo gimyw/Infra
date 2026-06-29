@@ -56,6 +56,23 @@ resource "helm_release" "argocd" {
   namespace        = "argocd"
   create_namespace = true
   version          = "9.6.0"
+
+  # argocd UI에서 canary 배포를 보기 위한 UI 화면
+  values = [yamlencode({
+    server = {
+      extensions = {
+        enabled = true
+        extensionList = [{
+          name = "rollout-extension"
+          env = [{
+            name  = "EXTENSION_URL"
+            # ArgoCD v3.4.4(신 React) 호환 = rollout-extension v0.4.0 (asset URL 200 확인)
+            value = "https://github.com/argoproj-labs/rollout-extension/releases/download/v0.4.0/extension.tar"
+          }]
+        }]
+      }
+    }
+  })]
 }
 
 resource "aws_iam_policy" "lbc" {
