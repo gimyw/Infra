@@ -1,0 +1,41 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: jaeger
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://jaegertracing.github.io/helm-charts
+    chart: jaeger
+    targetRevision: 3.4.1
+    helm:
+      values: |
+        # 학습용 
+        provisionDataStore:
+          cassandra: false
+          elasticsearch: false
+        allInOne:
+          enabled: true
+          # Jaeger 1.35는 OTLP(4317/4318) 기본 동작함, 명시해두면 안전하다.
+          extraEnv:
+            - name: COLLECTOR_OTLP_ENABLED
+              value: "true"
+        storage:
+          type: memory
+        agent:
+          enabled: false
+        collector:
+          enabled: false
+        query:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: istio-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    

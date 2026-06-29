@@ -11,6 +11,15 @@ spec:
     repoURL: https://istio-release.storage.googleapis.com/charts
     chart: istiod
     targetRevision: 1.30.1
+    helm:
+      values: |
+        meshConfig:
+          enableTracing: true
+          extensionProviders:
+            - name: jaeger-otel
+              opentelemetry:
+                service: jaeger-collector.istio-system.svc.cluster.local   # jaeger svc 확인값
+                port: 4317                                                  # OTLP gRPC
   destination:
     server: https://kubernetes.default.svc
     namespace: istio-system
