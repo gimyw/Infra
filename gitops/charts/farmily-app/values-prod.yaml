@@ -17,7 +17,6 @@ app:
     - {name: AGENTCORE_URL, value: "http://farmily-app-ai:8080"}
     - {name: AUTH_DEV_MASTER_ENABLED, value: "true"}
     - {name: AI_PROVIDER, value: "agentcore",}
-    - {name: CANARY_DEMO, value: "1"} # [임시] 카나리 대시보드 확인용 트리거 — 확인 후 제거 PR로 원복
     # 백엔드 트레이싱은 자체 Tempo → CloudWatch Application Signals 로 이전. (DR 생존: 관측 평면을 클러스터 밖으로)
     # 계측은 amazon-cloudwatch-observability 애드온이 ADOT 자바에이전트를 자동 주입 → 트레이스용 OTEL_* env 불필요(주입 측이 세팅).
     # 활성화 스위치 = templates/deployment-app.yaml 의 inject-java 어노테이션 (Phase 3, 백엔드 이미지 승격 후).
