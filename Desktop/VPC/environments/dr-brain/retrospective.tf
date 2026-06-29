@@ -35,7 +35,8 @@ resource "aws_iam_role_policy" "retrospective" {
     Statement = [
       { Effect = "Allow", Action = ["states:GetExecutionHistory"], Resource = "*" },
       { Effect = "Allow", Action = ["bedrock:InvokeModel"], Resource = "*" },
-      { Effect = "Allow", Action = ["s3:PutObject"], Resource = "${aws_s3_bucket.reports.arn}/*" }
+      { Effect = "Allow", Action = ["s3:PutObject"], Resource = "${aws_s3_bucket.reports.arn}/*" },
+      { Effect = "Allow", Action = ["secretsmanager:GetSecretValue"], Resource = local.slack_secret_arn } # Slack 게시
     ]
   })
 }
@@ -51,6 +52,7 @@ resource "aws_lambda_function" "retrospective" {
     variables = {
       MODEL_ID      = var.bedrock_model_id
       REPORT_BUCKET = aws_s3_bucket.reports.bucket
+      SLACK_SECRET  = "farmily/dr/slack" # 회고를 Slack에도 게시(없으면 skip)
     }
   }
 }

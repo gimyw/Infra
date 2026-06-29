@@ -44,8 +44,8 @@ resource "aws_iam_role_policy" "fence" {
       },
       {
         Effect   = "Allow"
-        Action   = ["rds:ModifyDBInstance"]
-        Resource = "*" # 서울 prod-rds
+        Action   = ["rds:ModifyDBInstance", "rds:DescribeDBInstances"] # Describe = 교체 전 원래 SG 백업
+        Resource = "*"                                                 # 서울 prod-rds
       }
     ]
   })

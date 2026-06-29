@@ -30,6 +30,23 @@ def _replace_card(response_url, text):
         pass
 
 
+def _control(action_id):
+    # 회고 카드의 복구 버튼(unfence/pin/unpin) → 해당 Lambda를 직접 호출하고 결과 문구를 돌려준다.
+    # 승인 토큰 흐름과 무관 — 상태기계 밖의 수동 제어 동작이다.
+    lam = boto3.client("lambda", region_name=REGION)
+    if action_id == "unfence":
+        fn, payload = os.environ["UNFENCE_FN"], {}
+    else:  # pin / unpin
+        fn, payload = os.environ["TRAFFIC_PIN_FN"], {"action": action_id}
+    try:
+        resp = lam.invoke(FunctionName=fn, Payload=json.dumps(payload).encode())
+        out = json.loads(resp["Payload"].read() or "{}")
+    except Exception as e:
+        return f"⚠️ {action_id} 실행 실패: {str(e)[:200]}"
+    labels = {"unfence": "🔧 서울 DB 복구(unfence)", "pin": "📌 트래픽 도쿄 고정(pin)", "unpin": "📍 트래픽 해제(unpin)"}
+    return f"{labels.get(action_id, action_id)} 완료 — `{json.dumps(out, ensure_ascii=False)[:300]}`"
+
+
 def handler(event, _ctx):
     sm  = boto3.client("secretsmanager", region_name=REGION)
     cfg = json.loads(sm.get_secret_value(SecretId=os.environ["SLACK_SECRET"])["SecretString"])
@@ -45,6 +62,13 @@ def handler(event, _ctx):
 
     payload = json.loads(urllib.parse.parse_qs(body)["payload"][0])
     response_url = payload.get("response_url")          # 원본 카드를 교체할 때 쓴다(클릭마다 Slack이 줌)
+    action_id = payload["actions"][0].get("action_id", "")
+
+    # 회고 카드의 복구 버튼(승인 토큰 흐름이 아님) — 해당 Lambda를 직접 호출
+    if action_id in ("unfence", "pin", "unpin"):
+        _replace_card(response_url, _control(action_id))
+        return {"statusCode": 200, "body": "ok"}
+
     parts = payload["actions"][0]["value"].split(":")   # approve:tid:mode / reject:tid:mode
     decision, tid = parts[0], parts[1]
     mode = parts[2] if len(parts) > 2 else "dry"        # 구버전 카드(value 2조각) 대비 기본 dry
