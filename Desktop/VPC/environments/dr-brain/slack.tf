@@ -105,6 +105,12 @@ resource "aws_iam_role_policy" "slack_callback" {
         Effect   = "Allow"
         Action   = ["states:SendTaskSuccess", "states:SendTaskFailure"]
         Resource = "*"
+      },
+      {
+        # 회고 카드의 복구 버튼(unfence/pin/unpin)이 누르면 콜백이 해당 Lambda를 직접 호출
+        Effect   = "Allow"
+        Action   = ["lambda:InvokeFunction"]
+        Resource = [aws_lambda_function.unfence.arn, aws_lambda_function.traffic_pin.arn]
       }
     ]
   })
@@ -119,8 +125,10 @@ resource "aws_lambda_function" "slack_callback" {
   role             = aws_iam_role.slack_callback.arn
   environment {
     variables = {
-      SLACK_SECRET = "farmily/dr/slack"
-      TOKENS_TABLE = aws_dynamodb_table.tasktokens.name
+      SLACK_SECRET   = "farmily/dr/slack"
+      TOKENS_TABLE   = aws_dynamodb_table.tasktokens.name
+      UNFENCE_FN     = aws_lambda_function.unfence.function_name     # 회고 카드 복구 버튼용
+      TRAFFIC_PIN_FN = aws_lambda_function.traffic_pin.function_name # 회고 카드 트래픽 버튼용
     }
   }
 }

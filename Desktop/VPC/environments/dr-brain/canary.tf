@@ -22,7 +22,7 @@ resource "aws_iam_role_policy" "canary" {
     Statement = [
       {
         Effect   = "Allow"
-        Action   = ["dynamodb:UpdateItem"]
+        Action   = ["dynamodb:GetItem", "dynamodb:UpdateItem"]
         Resource = aws_dynamodb_table.coordinator.arn
       },
       {
@@ -34,6 +34,12 @@ resource "aws_iam_role_policy" "canary" {
         Effect   = "Allow"
         Action   = ["cloudwatch:GetMetricStatistics"]
         Resource = "*"
+      },
+      {
+        # confirmed_down이면 failover 상태기계를 자동 시작(중복방지로 ListExecutions도)
+        Effect   = "Allow"
+        Action   = ["states:StartExecution", "states:ListExecutions"]
+        Resource = aws_sfn_state_machine.failover.arn
       }
     ]
   })
@@ -51,7 +57,8 @@ resource "aws_lambda_function" "canary" {
       SEOUL_HEALTH_URL  = var.seoul_health_url # ⚠️ 서울 prod ALB '직접' DNS (failover 도메인 아님)
       COORDINATOR_TABLE = aws_dynamodb_table.coordinator.name
       ALERT_TOPIC       = aws_sns_topic.approvals.arn
-      ROUTE53_HC_ID     = var.route53_hc_id # 있으면 교차검증, 없으면 "" (생략)
+      ROUTE53_HC_ID     = var.route53_hc_id                  # 있으면 교차검증, 없으면 "" (생략)
+      STATE_MACHINE_ARN = aws_sfn_state_machine.failover.arn # confirmed_down이면 자동 시작
     }
   }
 }

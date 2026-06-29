@@ -34,9 +34,20 @@ def handler(event, _ctx):
 
     pending, steps = False, {}
     try:                                               # 서울에 닿을 때만 (D4)
-        boto3.client("rds", region_name=SEOUL).modify_db_instance(
+        rds = boto3.client("rds", region_name=SEOUL)
+        # 교체 전 현재 SG를 백업한다(unfence 복구용). 이미 fence-sg뿐이면 진짜 백업을 덮어쓰지 않는다.
+        cur = [g["VpcSecurityGroupId"]
+               for g in rds.describe_db_instances(DBInstanceIdentifier=PROD_RDS)["DBInstances"][0]["VpcSecurityGroups"]
+               if g.get("Status") != "removing"]
+        if cur and cur != [FENCE_SG]:
+            boto3.client("dynamodb", region_name=TOKYO).update_item(
+                TableName=TABLE, Key={"key": {"S": "primary"}},
+                UpdateExpression="SET prev_sgs = :s",
+                ExpressionAttributeValues={":s": {"S": ",".join(cur)}})
+            steps["prev_sgs"] = ",".join(cur)          # unfence가 이 값으로 원복
+        rds.modify_db_instance(
             DBInstanceIdentifier=PROD_RDS, VpcSecurityGroupIds=[FENCE_SG], ApplyImmediately=True)
-        steps["sg"] = "swapped"                        # SG 리스트를 원자적으로 교체(인라인 편집 X)
+        steps["sg"] = "swapped"                         # SG 리스트를 원자적으로 교체(인라인 편집 X)
         if SEOUL_SECRET:
             boto3.client("secretsmanager", region_name=SEOUL).rotate_secret(SecretId=SEOUL_SECRET)
             steps["secret"] = "rotated"

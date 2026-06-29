@@ -14,3 +14,10 @@ variable "route53_hc_id" {
   type        = string
   default     = ""
 }
+
+# ── Phase 6(복구) traffic_pin ────────────────────────────────
+variable "seoul_health_check_id" {
+  description = "서울 ALB Route53 health check id (api.farmily.info failover의 PRIMARY 레코드). traffic_pin의 pin이 이 health check 경로를 실패 경로로 바꿔 강제 unhealthy로 만들어 트래픽을 도쿄에 묶는다. 실측: aws route53 list-health-checks (예: 5ffe143a-c2bd-4711-a262-8611e81682cb). 미설정 시 빈 문자열(pin/unpin 호출 시에만 필요)."
+  type        = string
+  default     = ""
+}
