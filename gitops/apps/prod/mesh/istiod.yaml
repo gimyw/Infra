@@ -18,7 +18,7 @@ spec:
           extensionProviders:
             - name: jaeger-otel
               opentelemetry:
-                service: jaeger-collector.istio-system.svc.cluster.local   # jaeger svc 확인값
+                service: jaeger-otlp.istio-system.svc.cluster.local   # jaeger svc 확인값
                 port: 4317                                                  # OTLP gRPC
   destination:
     server: https://kubernetes.default.svc

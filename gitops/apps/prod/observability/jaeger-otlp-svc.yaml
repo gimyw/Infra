@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-otlp
+  namespace: istio-system
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/component: all-in-one
+    app.kubernetes.io/instance: jaeger
+    app.kubernetes.io/name: jaeger
+  ports:
+    - name: grpc-otlp
+      port: 4317
+      targetPort: 4317
+      appProtocol: grpc 
