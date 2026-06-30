@@ -35,8 +35,14 @@ resource "aws_iam_role_policy" "agentcore" {
       { Sid = "CloudWatchMetrics", Effect = "Allow", Action = "cloudwatch:PutMetricData", Resource = "*" },
       # OTel/ADOT export — CloudWatch GenAI Observability (X-Ray Transaction Search + 구조화 로그).
       # ECS farmily-agentcore-task-role 에는 있으나 IRSA 복제 시 누락됐던 권한. 없으면 trace/log export 가 AccessDenied 로 조용히 실패.
-      { Sid = "XRayTrace", Effect = "Allow",
-      Action = ["xray:PutTraceSegments", "xray:PutTelemetryRecords"], Resource = "*" },
+      { Sid = "XRayTrace", Effect = "Allow", 
+        Action = [
+        "xray:PutTraceSegments", 
+        "xray:PutTelemetryRecords",
+        "xray:GetSamplingRules",
+        "xray:GetSamplingTargets",
+        "xray:GetSamplingStatisticSummaries"
+      ], Resource = "*" },
       { Sid = "CloudWatchLogs", Effect = "Allow",
         Action = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents",
       "logs:DescribeLogGroups", "logs:DescribeLogStreams"], Resource = "*" },
