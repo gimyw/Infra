@@ -42,8 +42,8 @@ ai:
     # 비밀 아닌 운영 설정 (IAM/SG로 막혀 평문 OK)
     - {name: MODEL_ID, value: "apac.anthropic.claude-3-5-sonnet-20241022-v2:0"}
     - {name: AWS_REGION, value: "ap-northeast-2"}
-    - {name: GUARDRAIL_ID, value: "pbebv1rby749"}
-    - {name: GUARDRAIL_VERSION, value: "1"}
+    # 가드레일 비활성: 정상 농산물 콘텐츠 오탐 차단으로 job 실패가 발생해 제거.
+    # agentcore는 GUARDRAIL_ID env 없으면 가드레일 미적용(if GUARDRAIL_ID 분기).
     - {name: CARD_RENDERER_LAMBDA, value: "farmily-card-renderer"}
     - {name: SELECT_PHOTO_LAMBDA, value: "farmily-select-photo"}
     # OTel 관측은 이미지에 박힘. 아래 2개만 pod env 로 override(이미지 ENV 를 덮음):
