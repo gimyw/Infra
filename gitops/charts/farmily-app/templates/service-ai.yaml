@@ -7,5 +7,5 @@ metadata:
   namespace: {{ .Values.namespace }}
 spec:
   selector: { app: {{ .Values.ai.name }} }
-  ports: [ { port: {{ .Values.ai.port }}, targetPort: {{ .Values.ai.port }} } ]
+  ports: [ { port: {{ .Values.ai.port }}, targetPort: {{ .Values.ai.port }}, appProtocol: http } ]
 {{- end }}
