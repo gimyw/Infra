@@ -6,4 +6,4 @@ metadata:
   namespace: {{ .Values.namespace }}
 spec:
   selector: { app: {{ .Values.app.name }} }
-  ports: [ { port: {{ .Values.app.port }}, targetPort: {{ .Values.app.port }} } ]
+  ports: [ { port: {{ .Values.app.port }}, targetPort: {{ .Values.app.port }}, appProtocol: http } ]
