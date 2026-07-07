@@ -215,59 +215,6 @@ module "s3" {
   cors_allowed_origins = ["http://localhost:3000", "https://farmily.info", "https://www.farmily.info"]
 }
 
-# S3 CRR: farmily-s3-bucket → 도쿄 복제
-resource "aws_iam_role" "s3_replication" {
-  name = "prod-s3-replication-role"
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect    = "Allow"
-      Principal = { Service = "s3.amazonaws.com" }
-      Action    = "sts:AssumeRole"
-    }]
-  })
-}
-
-resource "aws_iam_role_policy" "s3_replication" {
-  name = "prod-s3-replication-policy"
-  role = aws_iam_role.s3_replication.id
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect   = "Allow"
-        Action   = ["s3:GetReplicationConfiguration", "s3:ListBucket"]
-        Resource = [module.s3.bucket_arn]
-      },
-      {
-        Effect   = "Allow"
-        Action   = ["s3:GetObjectVersionForReplication", "s3:GetObjectVersionAcl", "s3:GetObjectVersionTagging"]
-        Resource = ["${module.s3.bucket_arn}/*"]
-      },
-      {
-        Effect   = "Allow"
-        Action   = ["s3:ReplicateObject", "s3:ReplicateDelete", "s3:ReplicateTags"]
-        Resource = ["arn:aws:s3:::farmily-s3-bucket-dr/*"]
-      }
-    ]
-  })
-}
-
-resource "aws_s3_bucket_replication_configuration" "images_crr" {
-  bucket = module.s3.bucket_id
-  role   = aws_iam_role.s3_replication.arn
-
-  rule {
-    id     = "dr-replication"
-    status = "Enabled"
-
-    destination {
-      bucket        = "arn:aws:s3:::farmily-s3-bucket-dr"
-      storage_class = "STANDARD"
-    }
-  }
-}
-
 # ECR Replication: farmily-api → 도쿄 자동 복제
 resource "aws_ecr_replication_configuration" "dr" {
   replication_configuration {
@@ -353,21 +300,6 @@ resource "aws_route53_record" "api_primary" {
   alias {
     name                   = module.ecs.alb_dns_name
     zone_id                = module.ecs.alb_zone_id
-    evaluate_target_health = true
-  }
-}
-
-resource "aws_route53_record" "api_secondary" {
-  zone_id = data.aws_route53_zone.main.zone_id
-  name    = "api.farmily.info"
-  type    = "A"
-
-  set_identifier = "secondary-tokyo"
-  failover_routing_policy { type = "SECONDARY" }
-
-  alias {
-    name                   = "dr-alb-489281855.ap-northeast-1.elb.amazonaws.com"
-    zone_id                = "Z14GRHDCWA56QT" # ap-northeast-1 ALB hosted zone ID
     evaluate_target_health = true
   }
 }
